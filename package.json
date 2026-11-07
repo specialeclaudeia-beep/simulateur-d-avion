@@ -1,0 +1,20 @@
+{
+  "name": "simulateur-compagnie-aerienne",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Simulateur de compagnie aérienne : jeu web gratuit, mobile et ordinateur.",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "maplibre-gl": "6.16.0"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vite": "8.3.6"
+  }
+}
