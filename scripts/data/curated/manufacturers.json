@@ -1,0 +1,9 @@
+[
+  {"id": "airbus", "name": "Airbus", "country": "FR", "hq": "Blagnac (Toulouse)", "founded": 1970, "wikidata": "Q2311", "website": "https://www.airbus.com", "contractDiscount": [0.45, 0.6], "deliveryMonths": [24, 72]},
+  {"id": "boeing", "name": "Boeing", "country": "US", "hq": "Arlington (Virginie)", "founded": 1916, "wikidata": "Q66", "website": "https://www.boeing.com", "contractDiscount": [0.45, 0.6], "deliveryMonths": [24, 72]},
+  {"id": "embraer", "name": "Embraer", "country": "BR", "hq": "São José dos Campos", "founded": 1969, "wikidata": "Q105557", "website": "https://www.embraer.com", "contractDiscount": [0.3, 0.45], "deliveryMonths": [12, 36]},
+  {"id": "atr", "name": "ATR", "country": "FR", "hq": "Blagnac (Toulouse)", "founded": 1981, "wikidata": "Q459083", "website": "https://www.atr-aircraft.com", "contractDiscount": [0.2, 0.35], "deliveryMonths": [12, 30]},
+  {"id": "dhc", "name": "De Havilland Canada", "country": "CA", "hq": "Calgary", "founded": 1928, "wikidata": "Q285246", "website": "https://dehavilland.com", "contractDiscount": [0.2, 0.35], "deliveryMonths": [12, 36]},
+  {"id": "comac", "name": "COMAC", "country": "CN", "hq": "Shanghai", "founded": 2008, "wikidata": "Q176788", "website": "http://www.comac.cc", "contractDiscount": [0.3, 0.5], "deliveryMonths": [18, 48]},
+  {"id": "uac", "name": "UAC (Yakovlev)", "country": "RU", "hq": "Moscou", "founded": 2006, "wikidata": "Q1136226", "website": "https://www.uacrussia.ru", "contractDiscount": [0.3, 0.5], "deliveryMonths": [18, 48]}
+]
