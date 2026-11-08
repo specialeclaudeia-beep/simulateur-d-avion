@@ -10,6 +10,7 @@ import { mountFlightCard } from './ui/flightCard';
 import { mountTrafficToggle } from './ui/trafficToggle';
 import { NetworkLayer } from './map/networkLayer';
 import { mountGame } from './ui/game';
+import { setupPwa } from './pwa';
 
 async function start(): Promise<void> {
   const clock = new GameClock();
@@ -38,6 +39,9 @@ async function start(): Promise<void> {
 
   await mountGame({ map, clock, countries, aircraft, network, onTimeJump: () => dayNight.refresh() });
 }
+
+// Appli installable et jeu hors connexion, prêts avant même la carte.
+setupPwa();
 
 start().catch((err: unknown) => {
   console.error(err);

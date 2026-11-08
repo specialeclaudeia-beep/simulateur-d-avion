@@ -17,6 +17,23 @@ npm test           # tests du moteur de jeu (vitest)
 `npm run dev` affiche une adresse « Network » (par ex. `http://192.168.1.20:5173`) :
 ouvre-la dans Chrome sur Android pour jouer sur le téléphone.
 
+## Installer le jeu comme une appli
+
+Sur Android, dans Chrome : onglet **Ma compagnie** puis « 📲 Installer le jeu », ou menu ⋮
+puis « Installer l'application ». Le jeu s'ouvre alors en plein écran depuis l'écran d'accueil.
+
+- **Sans connexion** : le service worker (`src/pwa/sw.js`) garde sur l'appareil tous les
+  fichiers du jeu, ainsi que les morceaux de carte déjà vus (1 500 au plus, les plus anciens
+  sont effacés). Au build, `vite.config.ts` complète `dist/sw.js` avec la liste des fichiers
+  et un numéro de version, qui change dès qu'un fichier change.
+- **Mises à jour** : au lancement, la version en ligne est prise s'il y a du réseau ; sinon
+  le jeu démarre avec la version gardée.
+- Le service worker n'existe que dans la version construite (`npm run build`), jamais avec
+  `npm run dev`.
+- Site protégé par la connexion Netlify : le manifeste est demandé avec
+  `crossorigin="use-credentials"` (dans `index.html`) : sans cela, Chrome n'envoie pas le
+  cookie de connexion en le demandant, et le serveur refuse de le lui donner.
+
 ## Ce qui est en place : la carte et le globe
 
 - **Globe 3D** (MapLibre GL, projection globe) : glisser, pincer pour zoomer, du globe
@@ -94,6 +111,7 @@ ouvre-la dans Chrome sur Android pour jouer sur le téléphone.
 | `src/game/` | Moteur du jeu, sans affichage : état et sauvegarde (`state.ts`, `save.ts`), simulation (`sim.ts`), actions du joueur (`actions.ts`), économie, flotte, hubs, pilotes, réglages chiffrés (`config.ts`) |
 | `src/ui/` | Interface par-dessus la carte (barre du temps, fiche pays, fiche vol) |
 | `src/ui/game/` | Interface du jeu : création de compagnie (`wizard.ts`), barre d'onglets et panneau (`ui.ts`), écrans (`views/`), styles (`game.css`) |
+| `src/pwa/` | Appli installable : service worker pour jouer sans connexion (`sw.js`), proposition d'installation de Chrome (`index.ts`) |
 | `tests/` | Tests du moteur (`npm test`) ; `calibration.test.ts` (avec `CALIB=1 npm test`) affiche des comptes simulés pour régler l'équilibre économique |
 | `public/geo/` | Données géographiques servies telles quelles (contours des pays, lumières des villes) |
 | `data/` | Données réelles du jeu (aéroports, trafic, lignes, avions), préparées à part |

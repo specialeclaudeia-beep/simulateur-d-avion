@@ -1,12 +1,13 @@
 /**
- * Ma compagnie : identité, chiffres clés, classement face aux vraies
- * compagnies, réglages, journal des événements et sauvegarde (export,
- * import, nouvelle partie).
+ * Ma compagnie : identité, installation du jeu comme une appli, chiffres
+ * clés, classement face aux vraies compagnies, réglages, journal des
+ * événements et sauvegarde (export, import, nouvelle partie).
  */
 import * as act from '../../../game/actions';
 import { DIFFICULTIES } from '../../../game/config';
 import { exportFileName, parseSave, serialize } from '../../../game/save';
 import type { LogEntry } from '../../../game/state';
+import { canInstall, install, isInstalled } from '../../../pwa';
 import { btn, compact, dateLong, esc, flagEmoji, kv, money, num, section, when } from '../dom';
 import { logoHtml } from '../logo';
 import type { Ui, View } from '../ui';
@@ -28,6 +29,18 @@ function ranking(ui: Ui): { rank: number; total: number; neighbour: string | nul
   const rank = 1 + airlines.filter((a) => a.routes > lines).length;
   const neighbour = airlines[rank - 2]?.name ?? null;
   return { rank, total: airlines.length + 1, neighbour };
+}
+
+/** Installer le jeu comme une appli : rien à afficher s'il l'est déjà. */
+function installSection(): string {
+  if (isInstalled()) return '';
+  return section(
+    'Appli',
+    canInstall()
+      ? `<p class="g-small">Installe le jeu sur ton écran d’accueil : il s’ouvrira en plein écran, comme une appli, même sans connexion.</p>
+         ${btn('📲 Installer le jeu', 'install')}`
+      : '<p class="g-small">Pour installer le jeu comme une appli : menu ⋮ de Chrome, puis « Installer l’application » (ou « Ajouter à l’écran d’accueil »). Il s’ouvrira en plein écran, même sans connexion.</p>',
+  );
 }
 
 export function companyView(ui: Ui, hooks: CompanyHooks): View {
@@ -53,6 +66,7 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
           <span><b>${esc(c.name)}</b><small>Code ${esc(c.code)} · ${flagEmoji(c.country)} ${esc(country?.name ?? c.country)} · fondée le ${esc(dateLong(c.founded))}</small>
           <small>Niveau ${esc(DIFFICULTIES[c.difficulty].label)}</small></span>
         </div>
+        ${installSection()}
         ${section(
           'En chiffres',
           kv([
@@ -102,7 +116,11 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
     },
     action(a) {
       if (a === 'export') exportSave(ui);
-      else if (a === 'new') {
+      else if (a === 'install') {
+        void install().then((ok) => {
+          if (ok) ui.toast('Le jeu s’installe sur ton écran d’accueil.', 'good');
+        });
+      } else if (a === 'new') {
         void ui
           .confirm({
             title: 'Recommencer une partie ?',
