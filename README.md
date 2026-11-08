@@ -25,8 +25,8 @@ ouvre-la dans Chrome sur Android pour jouer sur le téléphone.
   zones urbaines, routes, bâtiments en 3D de très près.
 - **Relief** : ombrage des montagnes (AWS Terrain Tiles) et sommets avec leur altitude.
 - **Jour / nuit** suivant la vraie position du soleil : ombre avec crépuscule progressif,
-  lumières des villes la nuit (image NASA Black Marble vue de loin, points par ville
-  en zoomant, rues éclairées de près).
+  lumières des villes la nuit (images NASA Black Marble, de plus en plus détaillées
+  en zoomant, puis rues éclairées de près). L'ombre glisse à chaque image, même en ×10000.
 - **Horloge du jeu** : temps réel par défaut, puis pause, ×10, ×100, ×1000, ×10000.
   Bouton « Maintenant » pour revenir à l'heure réelle.
 - **Pays cliquables** : toucher un pays le met en surbrillance et affiche son nom et son
@@ -51,7 +51,7 @@ que l'accélération du temps s'applique partout.
 - Fond de carte : [OpenFreeMap](https://openfreemap.org) / [OpenMapTiles](https://openmaptiles.org),
   données © [contributeurs OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL).
 - Relief : [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (Mapzen, sources ouvertes).
-- Lumières nocturnes : NASA Earth Observatory / GIBS, *Black Marble* VIIRS 2016 (domaine public).
-- Villes et contours des pays : [Natural Earth](https://www.naturalearthdata.com) (domaine public),
+- Lumières nocturnes : NASA Earth Observatory / GIBS, *Black Marble* VIIRS 2016 (domaine public), image mondiale puis tuiles détaillées selon le zoom.
+- Contours des pays : [Natural Earth](https://www.naturalearthdata.com) (domaine public),
   noms français repris du projet simulateur-mss.
 - Moteur de carte : [MapLibre GL JS](https://maplibre.org) (BSD-3-Clause).
