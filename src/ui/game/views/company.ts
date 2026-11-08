@@ -1,7 +1,8 @@
 /**
  * Ma compagnie : identité, installation du jeu comme une appli, chiffres
  * clés, classement face aux vraies compagnies, réglages, journal des
- * événements et sauvegarde (export, import, nouvelle partie).
+ * événements et sauvegarde (code à copier-coller, export et import d'un
+ * fichier, nouvelle partie).
  */
 import * as act from '../../../game/actions';
 import { DIFFICULTIES } from '../../../game/config';
@@ -93,7 +94,11 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
         ${section('Journal', journal ? `<ul class="g-log">${journal}</ul>` : '<p class="g-small">Rien pour l’instant.</p>')}
         ${section(
           'Sauvegarde',
-          `<p class="g-small">La partie s’enregistre toute seule dans ce navigateur. Exporte-la pour la garder en lieu sûr ou la continuer sur un autre appareil.</p>
+          `<p class="g-small">La partie s’enregistre toute seule dans ce navigateur, et chaque navigateur garde la sienne. Pour la continuer ailleurs (autre navigateur, appli installée, autre appareil) : copie son code ici et colle-le là-bas, ou passe par un fichier.</p>
+           <div class="g-actions">
+             ${btn('📋 Copier le code', 'copy', { cls: 'ghost' })}
+             ${btn('📥 Coller un code', 'paste', { cls: 'ghost' })}
+           </div>
            <div class="g-actions">
              ${btn('⬇️ Exporter la partie', 'export', { cls: 'ghost' })}
              <label class="g-btn ghost g-file">⬆️ Importer une partie<input type="file" accept="application/json,.json" data-in="import"></label>
@@ -116,6 +121,8 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
     },
     action(a) {
       if (a === 'export') exportSave(ui);
+      else if (a === 'copy') void copySaveCode(ui);
+      else if (a === 'paste') void pasteSaveCode(ui, hooks);
       else if (a === 'install') {
         void install().then((ok) => {
           if (ok) ui.toast('Le jeu s’installe sur ton écran d’accueil.', 'good');
@@ -151,11 +158,39 @@ function exportSave(ui: Ui): void {
   ui.toast('Fichier de sauvegarde téléchargé.', 'good');
 }
 
+/** Copie la partie sous forme de code, à coller dans un autre navigateur (« Coller un code »). */
+async function copySaveCode(ui: Ui): Promise<void> {
+  ui.game.saveNow();
+  try {
+    await navigator.clipboard.writeText(serialize(ui.game.state));
+    ui.toast('Code copié. Dans l’autre navigateur : Ma compagnie, puis « Coller un code ».', 'good');
+  } catch {
+    ui.toast('Ce navigateur refuse la copie : utilise plutôt « Exporter la partie ».', 'bad');
+  }
+}
+
+/** Charge une partie à partir d'un code collé (copié dans un autre navigateur). */
+async function pasteSaveCode(ui: Ui, hooks: CompanyHooks): Promise<void> {
+  const code = await ui.prompt({
+    title: 'Coller le code d’une partie',
+    text: 'Dans l’autre navigateur : Ma compagnie, puis « Copier le code ». Ici, touche longuement la zone ci-dessous, puis « Coller ».',
+    value: '',
+    placeholder: 'Code de la partie',
+    multiline: true,
+    ok: 'Charger',
+  });
+  if (code?.trim()) await importSaveText(ui, code, hooks);
+}
+
 async function importSave(ui: Ui, input: HTMLInputElement, hooks: CompanyHooks): Promise<void> {
   const file = input.files?.[0];
   input.value = '';
-  if (!file) return;
-  const res = parseSave(await file.text());
+  if (file) await importSaveText(ui, await file.text(), hooks);
+}
+
+/** Remplace la partie en cours par celle d'un fichier ou d'un code, après confirmation. */
+async function importSaveText(ui: Ui, text: string, hooks: CompanyHooks): Promise<void> {
+  const res = parseSave(text);
   if (!res.ok) {
     ui.toast(res.error, 'bad');
     return;

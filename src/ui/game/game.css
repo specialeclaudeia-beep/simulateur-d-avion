@@ -675,6 +675,15 @@ select.g-input option {
   background: #0e1630;
 }
 
+/* Code d'une partie à coller : long texte, petit, sur plusieurs lignes. */
+.g-input.g-paste {
+  min-height: 120px;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  word-break: break-all;
+  resize: vertical;
+}
+
 .g-field {
   display: block;
   margin: 12px 0;

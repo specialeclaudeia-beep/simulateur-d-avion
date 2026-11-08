@@ -95,8 +95,10 @@ puis « Installer l'application ». Le jeu s'ouvre alors en plein écran depuis 
   sinon) ; ses avions volent au milieu du trafic réel ; toucher un hub, une ligne ou un avion ouvre
   sa fiche.
 - **Sauvegarde** : automatique dans le navigateur (`localStorage`, avec numéro de version et
-  migration), export / import d'un fichier ; une sauvegarde illisible est mise de côté, jamais
-  effacée. Le temps peut continuer quand le jeu est fermé (jusqu'à 7 jours).
+  migration). Chaque navigateur garde la sienne : pour passer de l'un à l'autre, « Copier le
+  code » puis « Coller un code » (onglet Ma compagnie), ou export / import d'un fichier. Une
+  sauvegarde illisible est mise de côté, jamais effacée. Le temps peut continuer quand le jeu
+  est fermé (jusqu'à 7 jours).
 
 ## Organisation du code
 
