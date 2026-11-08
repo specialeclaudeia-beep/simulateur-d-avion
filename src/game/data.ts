@@ -13,6 +13,7 @@ import metaJson from '../../data/meta.json';
 import airportsUrl from '../../data/airports.json?url';
 import routesUrl from '../../data/routes.json?url';
 import airlinesUrl from '../../data/airlines.json?url';
+import { distanceKm } from '../flights/geo';
 import {
   DEMAND_AIRLINES_EXP,
   DEMAND_PAX_EXP,
@@ -86,8 +87,11 @@ export interface Manufacturer {
   hq: string;
   founded: number;
   website: string;
-  contractDiscount: [number, number];
-  deliveryMonths: [number, number];
+  /** Remise négociable sur un contrat (null : ne vend plus d'avions neufs). */
+  contractDiscount: [number, number] | null;
+  deliveryMonths: [number, number] | null;
+  /** Constructeur disparu ou qui ne vend plus que des pièces : occasion seulement. */
+  usedOnly?: boolean;
   logo: string | null;
 }
 
@@ -109,9 +113,10 @@ export interface AircraftModel {
   lengthM: number;
   wingspanM: number;
   fuelKgH: number;
+  /** Prix catalogue neuf, ou valeur d'un exemplaire en milieu de vie si priceSource = 'occasion'. */
   priceUsd: number;
   priceYear: number;
-  priceSource: string;
+  priceSource: 'catalogue' | 'estimation' | 'occasion';
   eis: number;
   inProduction: boolean;
 }
@@ -204,6 +209,13 @@ export class GameData {
 
   runwayOf(a: Airport): number {
     return a.runwayM ?? RUNWAY_FALLBACK[a.tier];
+  }
+
+  /** Distance à vol d'oiseau (grand cercle) entre deux aéroports, en km. */
+  distanceKm(from: string, to: string): number {
+    const a = this.airport(from);
+    const b = this.airport(to);
+    return distanceKm(a.lon, a.lat, b.lon, b.lat);
   }
 
   /** Aéroports d'un pays qui ont au moins une ligne (classés du plus grand au plus petit). */

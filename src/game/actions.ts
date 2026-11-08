@@ -7,7 +7,6 @@
  * jusqu'à `t`, voir Game.run).
  */
 import {
-  HUB_RESALE,
   LINE_OPEN_BASE,
   LINE_OPEN_PER_KM,
   LOAN_ASSET_SHARE,
@@ -25,8 +24,7 @@ import { fail, invalidate, log, ok, type ActionResult, type Ctx } from './contex
 import { GameData } from './data';
 import { aircraftValue, blockMinutes, pilotProblem, routeProblem } from './economy';
 import { orderQuote } from './fleet';
-import { distanceKm } from './geo';
-import { HUB_UPGRADE_LABEL, hubPrice, hubValue, newHub, upgradeInfo, type HubUpgrade } from './hubs';
+import { HUB_UPGRADE_LABEL, hubPrice, hubResale, hubValue, newHub, upgradeInfo, type HubUpgrade } from './hubs';
 import { earn, money, spend } from './ledger';
 import { randomName, namePoolFor, randomRegistration } from './names';
 import { baseSalary, pilotName, trainingCost, typeRatingSpec } from './pilots';
@@ -93,7 +91,7 @@ export function sellHub(ctx: Ctx, t: number, iata: string): ActionResult {
   if (s.hubs.length <= 1) return fail('Une compagnie doit garder au moins un hub.');
   if (basedAircraft(s, iata).length) return fail('Change d’abord la base des avions rattachés à ce hub.');
   if (s.lines.some((l) => l.hub === iata)) return fail('Ferme d’abord les lignes qui partent de ce hub.');
-  const value = Math.round(((hub.pricePaid + hub.invested) * HUB_RESALE) / 10_000) * 10_000;
+  const value = hubResale(hub);
   s.hubs = s.hubs.filter((h) => h !== hub);
   earn(s, 'assetSales', value);
   log(ctx, 'money', `Vente du hub ${city(ctx, iata)} pour ${money(value)}`, undefined, t);
@@ -237,7 +235,7 @@ export function transferAircraft(ctx: Ctx, t: number, id: string, newBase: strin
   if (!(ac.status === 'idle' || ac.status === 'ground') || ac.location !== ac.base) return fail('L’avion doit être au sol à son hub actuel.');
   if (parkingLeft(ctx, newBase) < 1) return fail(`Plus de place au parking de ${city(ctx, newBase)}.`);
   const model = data.model(ac.modelId);
-  const km = Math.round(distanceKm(data.airport(ac.base), data.airport(newBase)));
+  const km = Math.round(data.distanceKm(ac.base, newBase));
   if (km > model.rangeKm) return fail(`Trop loin pour un ${model.name} (${km} km).`);
   const minutes = blockMinutes(km, model);
   const from = ac.base;

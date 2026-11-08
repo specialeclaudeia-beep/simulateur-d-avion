@@ -30,6 +30,16 @@ const FAMILY_WEIGHT: Record<string, number> = {
   C909: 0.5,
   SSJ: 0.4,
   'MC-21': 0.3,
+  // Modèles plus fabriqués mais encore très présents dans le ciel.
+  CRJ: 1,
+  ERJ: 0.6,
+  '757': 0.5,
+  '717': 0.3,
+  A300: 0.3,
+  A340: 0.3,
+  'MD-11': 0.2,
+  'Saab 340': 0.3,
+  B1900: 0.3,
 };
 
 export function baseSalary(data: GameData, state: GameState, stars: number): number {

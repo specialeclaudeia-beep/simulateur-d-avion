@@ -8,6 +8,8 @@ import { mountHud } from './ui/hud';
 import { AircraftLayer } from './map/aircraft';
 import { mountFlightCard } from './ui/flightCard';
 import { mountTrafficToggle } from './ui/trafficToggle';
+import { NetworkLayer } from './map/networkLayer';
+import { mountGame } from './ui/game';
 
 async function start(): Promise<void> {
   const clock = new GameClock();
@@ -18,6 +20,8 @@ async function start(): Promise<void> {
 
   // Les avions s'installent avant les pays : toucher un avion ne sélectionne pas le pays dessous.
   const aircraft = new AircraftLayer(map, clock);
+  // Le réseau du joueur aussi : toucher un de ses hubs ou une de ses lignes ouvre sa fiche.
+  const network = new NetworkLayer(map);
 
   const countries = new Countries(map);
   await countries.install();
@@ -31,6 +35,8 @@ async function start(): Promise<void> {
 
   // Accès pratique depuis la console du navigateur pour tester.
   Object.assign(window, { map, clock, countries, aircraft });
+
+  await mountGame({ map, clock, countries, aircraft, network, onTimeJump: () => dayNight.refresh() });
 }
 
 start().catch((err: unknown) => {

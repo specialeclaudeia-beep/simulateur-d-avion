@@ -4,7 +4,8 @@
 import { describe, expect, it } from 'vitest';
 import * as act from '../src/game/actions';
 import { DAY, HOUR } from '../src/game/config';
-import { orderQuote } from '../src/game/fleet';
+import { YEAR, marketValue } from '../src/game/economy';
+import { generateUsedListings, orderQuote } from '../src/game/fleet';
 import { playerFlights, setFlightSource } from '../src/game/flights';
 import { upgradeInfo } from '../src/game/hubs';
 import { summarize } from '../src/game/ledger';
@@ -79,7 +80,7 @@ describe('vols', () => {
     const mid = (leg.dep + leg.arr) / 2;
     const flights = playerFlights(mid);
     expect(flights).toHaveLength(1);
-    expect(flights[0]).toMatchObject({ airline: 'AT', player: true, aircraftId: 'a320neo', ref: ac.id, from: leg.from, to: leg.to });
+    expect(flights[0]).toMatchObject({ airline: 'player', airlineName: 'Air Test', player: true, aircraftId: 'a320neo', ref: ac.id, from: leg.from, to: leg.to });
     expect(playerFlights(leg.arr + 1)).toHaveLength(0);
 
     advance(ctx, now + 3 * DAY);
@@ -228,6 +229,20 @@ describe('règles', () => {
     const b7779 = orderQuote(data, ctx.state, data.model('b777-9'), 1, T0);
     expect(b7779.deliveries[0]).toBeGreaterThanOrEqual(Date.UTC(2027, 0, 1));
     expect(act.orderAircraft(ctx, T0, 'a380', 1, 'NCE').ok).toBe(false); // plus fabriqué
+  });
+
+  it('les modèles plus fabriqués se trouvent seulement d’occasion, à un prix cohérent', () => {
+    const ctx = newTestGame();
+    const ceo = ctx.data.model('a320ceo');
+    expect(ceo.inProduction).toBe(false);
+    expect(act.orderAircraft(ctx, T0, 'a320ceo', 1, 'NCE').ok).toBe(false);
+    // Le prix des données est celui d'un exemplaire de 12 ans à 75 %.
+    expect(Math.abs(marketValue(ctx.data, ceo, 12, 75) - ceo.priceUsd)).toBeLessThan(1);
+    const listings = generateUsedListings(ctx, T0, 300);
+    const old = listings.filter((l) => !ctx.data.model(l.modelId).inProduction);
+    expect(old.length).toBeGreaterThan(0);
+    for (const l of old) expect(T0 - l.builtAt).toBeGreaterThanOrEqual(4 * YEAR - 1);
+    for (const l of listings) expect(l.price).toBeGreaterThan(0);
   });
 
   it('forme un pilote et le qualifie', () => {

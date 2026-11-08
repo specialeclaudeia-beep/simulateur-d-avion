@@ -9,6 +9,7 @@ import {
   LOYALTY_MAX,
   LOYALTY_STEP,
   USED_MARKET_SIZE,
+  USED_MAX_AGE,
   volumeShare,
 } from './config';
 import type { Ctx } from './context';
@@ -31,11 +32,11 @@ export interface OrderQuote {
 /** Devis pour une commande d'avions neufs. */
 export function orderQuote(data: GameData, state: GameState, model: AircraftModel, qty: number, t: number): OrderQuote {
   const mfr = data.manufacturerById.get(model.mfr)!;
-  const [dMin, dMax] = mfr.contractDiscount;
+  const [dMin, dMax] = mfr.contractDiscount ?? [0, 0];
   const loyalty = Math.min(LOYALTY_MAX, Math.floor((state.relations[mfr.id] ?? 0) / LOYALTY_STEP) * 0.01);
   const discount = Math.min(0.7, dMin + (dMax - dMin) * volumeShare(qty) + loyalty);
   const unitPrice = Math.round((model.priceUsd * (1 - discount)) / 10_000) * 10_000;
-  let first = t + mfr.deliveryMonths[0] * DELIVERY_DAYS_PER_MONTH * DAY;
+  let first = t + (mfr.deliveryMonths?.[0] ?? 12) * DELIVERY_DAYS_PER_MONTH * DAY;
   // Un avion pas encore certifié ne peut pas être livré avant son année de mise en service.
   if (model.eis > utcYear(t)) first = Math.max(first, Date.UTC(model.eis, 0, 1));
   const deliveries = Array.from({ length: qty }, (_, i) => first + i * DELIVERY_SPACING_DAYS * DAY);
@@ -60,8 +61,10 @@ export function generateUsedListings(ctx: Ctx, t: number, count = USED_MARKET_SI
   const out: UsedListing[] = [];
   for (let i = 0; i < count && models.length; i++) {
     const m = pickWeighted(rng, models, weights);
-    const maxAge = Math.min(25, year - m.eis);
-    const age = 1 + (maxAge - 1) * rng() ** 0.9;
+    // Un modèle plus fabriqué n'existe qu'en exemplaires d'au moins quelques années.
+    const minAge = m.inProduction ? 1 : 4;
+    const maxAge = Math.max(minAge, Math.min(m.inProduction ? 25 : USED_MAX_AGE, year - m.eis));
+    const age = minAge + (maxAge - minAge) * rng() ** 0.9;
     const condition = Math.round(Math.min(95, Math.max(40, 55 + rng() * 40 - age * 0.6)));
     out.push({
       id: `O${++state.counters.listing}`,

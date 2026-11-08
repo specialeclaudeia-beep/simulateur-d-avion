@@ -179,6 +179,11 @@ export const LOYALTY_STEP = 5;
 export const LOYALTY_MAX = 0.05;
 /** Décote annuelle d'un avion et valeur selon son état. */
 export const DEPRECIATION_PER_YEAR = 0.92;
+/** Modèles plus fabriqués : leur prix (« occasion ») est celui d'un exemplaire de cet âge et cet état. */
+export const USED_REFERENCE_AGE = 12;
+export const USED_REFERENCE_CONDITION = 75;
+/** Âge maximal d'un avion proposé sur le marché de l'occasion (années). */
+export const USED_MAX_AGE = 30;
 /** Délai d'un avion d'occasion (convoyage jusqu'au hub), en heures. */
 export const USED_DELIVERY_HOURS = 36;
 export const USED_MARKET_SIZE = 10;

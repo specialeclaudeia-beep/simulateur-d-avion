@@ -33,6 +33,8 @@ import {
   SERVICE_PER_CARGO_T,
   SERVICE_PER_PAX,
   TURNAROUND_MIN,
+  USED_REFERENCE_AGE,
+  USED_REFERENCE_CONDITION,
   WEAR_PER_CYCLE,
   WEAR_PER_HOUR,
   baseCargoRate,
@@ -77,10 +79,30 @@ export function averageDiscount(data: GameData, mfr: string): number {
   return (d[0] + d[1]) / 2;
 }
 
+function conditionFactor(condition: number): number {
+  return 0.6 + (0.4 * condition) / 100;
+}
+
+/**
+ * Prix de référence d'un modèle pour les réparations et révisions : le prix catalogue,
+ * ou pour un modèle plus fabriqué, sa valeur neuve estimée.
+ */
+export function referencePrice(data: GameData, m: AircraftModel): number {
+  return m.priceSource === 'occasion' ? newValue(data, m) : m.priceUsd;
+}
+
+/** Valeur d'un avion neuf réellement payée (prix catalogue moins la remise habituelle). */
+function newValue(data: GameData, m: AircraftModel): number {
+  if (m.priceSource === 'occasion') {
+    // Le prix connu est celui d'un exemplaire en milieu de vie : on remonte à sa valeur neuve.
+    return m.priceUsd / (DEPRECIATION_PER_YEAR ** USED_REFERENCE_AGE * conditionFactor(USED_REFERENCE_CONDITION));
+  }
+  return m.priceUsd * (1 - averageDiscount(data, m.mfr));
+}
+
 /** Valeur de revente d'un avion selon son âge et son état. */
 export function marketValue(data: GameData, m: AircraftModel, age: number, condition: number): number {
-  const fresh = m.priceUsd * (1 - averageDiscount(data, m.mfr));
-  return fresh * DEPRECIATION_PER_YEAR ** age * (0.6 + (0.4 * condition) / 100);
+  return newValue(data, m) * DEPRECIATION_PER_YEAR ** age * conditionFactor(condition);
 }
 
 export function aircraftValue(data: GameData, ac: Aircraft, now: number): number {

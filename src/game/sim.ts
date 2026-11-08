@@ -48,6 +48,7 @@ import {
   playerCargoPerDay,
   playerPaxPerDay,
   referenceCargoRate,
+  referencePrice,
   referenceFare,
   routeProblem,
   seatsOf,
@@ -57,7 +58,6 @@ import {
   wearPerLeg,
 } from './economy';
 import { generateUsedListings } from './fleet';
-import { distanceKm } from './geo';
 import { closeMonth, earn, spend } from './ledger';
 import { generateCandidates, pilotName } from './pilots';
 import { randRange } from './rng';
@@ -268,7 +268,7 @@ export function depart(ctx: Ctx, ac: Aircraft, from: string, to: string, line: L
   const model = data.model(ac.modelId);
   const A = data.airport(from);
   const B = data.airport(to);
-  const km = line ? line.km : Math.round(distanceKm(A, B));
+  const km = line ? line.km : Math.round(data.distanceKm(from, to));
   const minutes = blockMinutes(km, model);
   const pilot = pilotOf(ctx, ac);
   const seats = seatsOf(model);
@@ -368,7 +368,7 @@ function arrive(ctx: Ctx, ac: Aircraft, t: number): void {
   s.stats.flights++;
   s.stats.pax += leg.pax;
   s.stats.cargoT += leg.cargoT;
-  s.stats.km += Math.round(distanceKm(data.airport(leg.from), data.airport(leg.to)));
+  s.stats.km += Math.round(data.distanceKm(leg.from, leg.to));
   s.stats.revenue += leg.revenue;
   s.ledger.flights++;
   s.ledger.pax += leg.pax;
@@ -425,7 +425,7 @@ function breakDown(ctx: Ctx, ac: Aircraft, t: number): void {
   ac.breakdown = {
     severity: major ? 'major' : 'minor',
     hours: Math.round(randRange(rng, spec.hours)),
-    cost: Math.round((model.priceUsd * randRange(rng, spec.cost)) / 1000) * 1000,
+    cost: Math.round((referencePrice(data, model) * randRange(rng, spec.cost)) / 1000) * 1000,
     at: t,
   };
   ac.status = 'broken';
@@ -477,7 +477,7 @@ export function maintenanceQuote(ctx: Ctx, ac: Aircraft): { cost: number; hours:
   const level = ctx.state.hubs.find((h) => h.iata === ac.location)?.maintenance ?? 0;
   const eff = 1 - MAINTENANCE_EFFECT[level];
   return {
-    cost: Math.round((model.priceUsd * CHECK_COST_PER_POINT * points * eff) / 1000) * 1000,
+    cost: Math.round((referencePrice(ctx.data, model) * CHECK_COST_PER_POINT * points * eff) / 1000) * 1000,
     hours: Math.max(2, Math.round((CHECK_HOURS_BASE + CHECK_HOURS_PER_POINT * points) * eff)),
   };
 }

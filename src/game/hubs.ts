@@ -5,6 +5,7 @@
 import {
   DEPARTURES_PER_GATE,
   FOREIGN_HUB_MULT,
+  HUB_RESALE,
   HUB_START,
   MAINTENANCE_EFFECT,
   MAINTENANCE_MAX,
@@ -121,4 +122,9 @@ export function upgradeInfo(data: GameData, hub: Hub, kind: HubUpgrade): Upgrade
 /** Valeur estimée d'un hub (pour la valeur de la compagnie et les emprunts). */
 export function hubValue(hub: Hub): number {
   return hub.pricePaid * 0.8 + hub.invested * 0.5;
+}
+
+/** Ce que rapporte la revente d'un hub : une part de tout ce qu'on y a mis, arrondie à 10 000 $. */
+export function hubResale(hub: Hub): number {
+  return Math.round(((hub.pricePaid + hub.invested) * HUB_RESALE) / 10_000) * 10_000;
 }
