@@ -1376,6 +1376,10 @@ body.game-on .traffic-toggle {
   bottom: calc(var(--nav-h) + 40px + env(safe-area-inset-bottom));
 }
 
+body.game-on .sound-toggle {
+  bottom: calc(var(--nav-h) + 82px + env(safe-area-inset-bottom));
+}
+
 body.game-on .maplibregl-ctrl-bottom-left,
 body.game-on .maplibregl-ctrl-bottom-right {
   bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
@@ -1387,9 +1391,11 @@ body.wizard-on .country-card {
 
 @media (max-width: 899px) {
   body.sheet-open .traffic-toggle,
+  body.sheet-open .sound-toggle,
   body.sheet-open .maplibregl-ctrl-bottom-left,
   body.sheet-open .maplibregl-ctrl-bottom-right,
   body.wizard-on .traffic-toggle,
+  body.wizard-on .sound-toggle,
   body.wizard-on .maplibregl-ctrl-bottom-left,
   body.wizard-on .maplibregl-ctrl-bottom-right {
     display: none;
@@ -1459,4 +1465,18 @@ body.wizard-on .country-card {
   body.wizard-on .g-toasts {
     left: calc((100% - 444px) / 2);
   }
+}
+
+/* Volume de la musique (Ma compagnie) */
+.g-volume {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.g-volume input[type='range'] {
+  flex: 1;
+  accent-color: var(--g-accent);
+  min-height: 32px; /* curseur facile à attraper au doigt */
 }

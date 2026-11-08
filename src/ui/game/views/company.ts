@@ -8,6 +8,7 @@ import * as act from '../../../game/actions';
 import { DIFFICULTIES } from '../../../game/config';
 import { exportFileName, parseSave, serialize } from '../../../game/save';
 import type { LogEntry } from '../../../game/state';
+import { music } from '../../../audio/music';
 import { canInstall, install, isInstalled } from '../../../pwa';
 import { btn, compact, dateLong, esc, flagEmoji, kv, money, num, section, when } from '../dom';
 import { logoHtml } from '../logo';
@@ -91,6 +92,13 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
            <label class="g-toggle"><input type="checkbox" data-in="autoRepair"${st.autoRepair ? ' checked' : ''}><span>Réparer automatiquement les pannes</span></label>
            <label class="g-toggle"><input type="checkbox" data-in="offlineProgress"${st.offlineProgress ? ' checked' : ''}><span>Le temps continue quand le jeu est fermé (jusqu’à 7 jours, à vitesse réelle)</span></label>`,
         )}
+        ${section(
+          'Son',
+          `<label class="g-toggle"><input type="checkbox" data-in="musicOn"${music.on ? ' checked' : ''}><span>Musique</span></label>
+           <label class="g-volume"><span>Volume</span><input type="range" min="0" max="100" step="5" value="${Math.round(music.volume * 100)}" data-in="musicVolume" aria-label="Volume de la musique"></label>
+           <p class="g-small">${music.on ? `${music.playing ? '♪ En cours' : 'Prochain morceau'} : <b>${esc(music.track.title)}</b>` : 'Musique coupée.'}</p>
+           ${btn('⏭ Morceau suivant', 'nextTrack', { cls: 'ghost' })}`,
+        )}
         ${section('Journal', journal ? `<ul class="g-log">${journal}</ul>` : '<p class="g-small">Rien pour l’instant.</p>')}
         ${section(
           'Sauvegarde',
@@ -108,10 +116,18 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
       `;
     },
     input(el, final) {
-      if (!final) return;
       const key = el.dataset.in!;
-      if (key === 'import') {
+      if (key === 'import' && final) {
         void importSave(ui, el as HTMLInputElement, hooks);
+        return;
+      }
+      if (key === 'musicVolume') {
+        music.setVolume(Number(el.value) / 100);
+        return;
+      }
+      if (!final) return;
+      if (key === 'musicOn') {
+        music.setOn((el as HTMLInputElement).checked);
         return;
       }
       if (key === 'maintenanceThreshold') ui.act(act.updateSettings, { maintenanceThreshold: Number(el.value) });
@@ -121,6 +137,7 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
     },
     action(a) {
       if (a === 'export') exportSave(ui);
+      else if (a === 'nextTrack') music.next();
       else if (a === 'copy') void copySaveCode(ui);
       else if (a === 'paste') void pasteSaveCode(ui, hooks);
       else if (a === 'install') {

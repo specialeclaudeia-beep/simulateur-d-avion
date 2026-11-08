@@ -207,6 +207,16 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.sound-toggle {
+  position: fixed;
+  left: 8px;
+  bottom: calc(82px + env(safe-area-inset-bottom));
+  z-index: 10;
+  background: var(--hud-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
 .traffic-toggle.active {
   background: rgba(77, 163, 255, 0.9);
 }
