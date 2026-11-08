@@ -1,7 +1,8 @@
-import type { CanvasSource, ExpressionSpecification, GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
+import type { CanvasSource, Map as MapLibreMap } from 'maplibre-gl';
 import type { GameClock } from '../core/clock';
 import { subsolarPoint, sunAltitudeSin, type SubsolarPoint } from '../core/sun';
 import { SLOT } from './layerSlots';
+import { NightLightsDetail } from './nightLightsDetail';
 
 /**
  * Cycle jour / nuit.
@@ -10,8 +11,8 @@ import { SLOT } from './layerSlots';
  *   dégradé pour le crépuscule.
  * - Vue de loin, les lumières des villes viennent de l'image « Black Marble »
  *   de la NASA, affichée seulement là où il fait nuit.
- * - En zoomant, des points lumineux par ville (Natural Earth) prennent le
- *   relais en fondu, puis les rues s'éclairent de près.
+ * - En zoomant, des images NASA plus détaillées (chargées pour la zone vue)
+ *   prennent le relais en fondu, puis les rues s'éclairent de près.
  *
  * Fluidité : l'ombre ne dépend que de la déclinaison du soleil (qui change très
  * lentement) et de sa longitude. On calcule donc une seule fois une ombre
@@ -64,6 +65,7 @@ export class DayNight {
   private lightsLon = Number.NaN;
   private lightsUpdatedAt = 0;
   private sun: SubsolarPoint;
+  private detail: NightLightsDetail;
   private raf = 0;
 
   // Précalculs par ligne (latitude) du canvas d'ombre.
@@ -74,9 +76,16 @@ export class DayNight {
     private map: MapLibreMap,
     private clock: GameClock,
   ) {
-    for (const c of [this.shadeBase, this.maskBase, this.shadeCanvas, this.lightsMaskCanvas]) {
+    for (const c of [this.shadeCanvas, this.lightsMaskCanvas]) {
       c.width = c.height = SHADE_SIZE;
     }
+    // Les références sont deux fois plus larges (motif répété) : un seul dessin
+    // décalé suffit, sans raccord visible.
+    for (const c of [this.shadeBase, this.maskBase]) {
+      c.width = 2 * SHADE_SIZE;
+      c.height = SHADE_SIZE;
+    }
+    this.detail = new NightLightsDetail(map);
     this.lightsCanvas.width = this.lightsCanvas.height = LIGHTS_SIZE;
     for (let y = 0; y < SHADE_SIZE; y++) {
       const mercY = Math.PI * (1 - (2 * (y + 0.5)) / SHADE_SIZE);
@@ -103,49 +112,49 @@ export class DayNight {
       SLOT.night,
     );
 
+    // Calottes polaires : au-delà de 85° de latitude, le globe prolonge le bord
+    // des tuiles jusqu'au pôle, mais pas l'ombre (image hors tuiles). Deux petites
+    // tuiles transparentes dont seule la rangée du bord est colorée « nuit »
+    // assombrissent ces calottes ; leur opacité suit la nuit au pôle.
+    for (const pole of ['north', 'south'] as const) {
+      map.addSource(`night-pole-${pole}`, {
+        type: 'raster',
+        tiles: [new URL(`${import.meta.env.BASE_URL}geo/pole-${pole}.png`, location.href).href],
+        tileSize: 256,
+        minzoom: 0,
+        maxzoom: 0,
+      });
+      map.addLayer(
+        {
+          id: `night-pole-${pole}`,
+          type: 'raster',
+          source: `night-pole-${pole}`,
+          maxzoom: 6,
+          paint: { 'raster-fade-duration': 0, 'raster-opacity': 0, 'raster-resampling': 'nearest' },
+        },
+        SLOT.night,
+      );
+    }
+
     map.addSource('night-lights', { type: 'canvas', canvas: this.lightsCanvas, coordinates: COORDS, animate: false });
     map.addLayer(
       {
         id: 'night-lights',
         type: 'raster',
         source: 'night-lights',
-        maxzoom: 9,
+        maxzoom: 5,
         paint: {
           'raster-fade-duration': 0,
           'raster-resampling': 'linear',
-          // Reste visible longtemps (même un peu floue) pendant que les points
-          // des villes apparaissent : pas de « trou » en zoomant.
-          'raster-opacity': ['interpolate', ['linear'], ['zoom'], 0, 1, 4.5, 0.95, 7, 0.55, 9, 0],
+          // Vue de loin seulement : en zoomant, les images détaillées prennent le relais en fondu.
+          'raster-opacity': ['interpolate', ['linear'], ['zoom'], 0, 1, 3.3, 1, 4.5, 0],
         },
       },
       SLOT.night,
     );
 
-    map.addSource('city-lights', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-    map.addLayer(
-      {
-        id: 'city-lights',
-        type: 'circle',
-        source: 'city-lights',
-        minzoom: 2.5,
-        paint: {
-          'circle-color': '#ffd68a',
-          'circle-blur': 1,
-          'circle-pitch-alignment': 'map',
-          'circle-radius': [
-            'interpolate',
-            ['exponential', 2],
-            ['zoom'],
-            3,
-            ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 140, 0.8, 4000, 4],
-            10,
-            ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 140, 25, 4000, 160],
-          ],
-          'circle-opacity': 0,
-        },
-      },
-      SLOT.night,
-    );
+    // Lumières détaillées (images NASA nettes selon le zoom), pour les vues rapprochées.
+    await this.detail.install();
 
     // De près, la nuit, les rues s'éclairent (lampadaires).
     map.addLayer(
@@ -154,7 +163,7 @@ export class DayNight {
         type: 'line',
         source: 'openmaptiles',
         'source-layer': 'transportation',
-        minzoom: 8,
+        minzoom: 8.5,
         filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor']]],
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
@@ -181,7 +190,6 @@ export class DayNight {
 
     // Les données « lourdes » arrivent en arrière-plan, la carte s'affiche sans attendre.
     void this.loadLights();
-    void this.loadCityPoints();
 
     this.tick();
   }
@@ -214,6 +222,7 @@ export class DayNight {
       this.shadeLon = sun.lon;
       this.uploadCanvas('night-shade');
       this.updateStreets();
+      this.updatePoles(sun);
     }
 
     // Lumières : grande image, donc un peu moins souvent.
@@ -226,11 +235,11 @@ export class DayNight {
       this.lightsLon = sun.lon;
       this.shift(this.maskBase, this.lightsMaskCanvas, sun.lon);
       // Inutile de recomposer la grande image quand elle n'est pas affichée (zoom proche).
-      if (this.lightsSource && this.map.getZoom() < 9) {
+      if (this.lightsSource && this.map.getZoom() < 5) {
         this.composeLights();
         this.uploadCanvas('night-lights');
       }
-      this.updateCityPoints(sun);
+      this.detail.update(sun);
     }
   };
 
@@ -271,7 +280,9 @@ export class DayNight {
       }
     }
     shadeCtx.putImageData(shade, 0, 0);
+    shadeCtx.putImageData(shade, n, 0);
     maskCtx.putImageData(mask, 0, 0);
+    maskCtx.putImageData(mask, n, 0);
   }
 
   /** Copie `src` (soleil à la longitude 0) dans `dst`, décalée pour un soleil à `sunLon`. */
@@ -281,9 +292,8 @@ export class DayNight {
     dx = ((dx % n) + n) % n;
     const ctx = dst.getContext('2d')!;
     ctx.globalCompositeOperation = 'copy';
-    ctx.drawImage(src, dx, 0);
-    ctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(src, dx - n, 0);
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   /** Lumières = image Black Marble × masque de nuit. */
@@ -308,81 +318,51 @@ export class DayNight {
     ctx.drawImage(img, 0, 0, LIGHTS_SIZE, LIGHTS_SIZE);
     const data = ctx.getImageData(0, 0, LIGHTS_SIZE, LIGHTS_SIZE);
     const px = data.data;
+    // L'image contient les lumières en couleur sur fond noir : la luminosité
+    // devient la transparence, la couleur est conservée.
     for (let i = 0; i < px.length; i += 4) {
-      const l = px[i] / 255;
-      // Orange chaud pour les lumières faibles, presque blanc pour les plus fortes.
-      px[i] = 255;
-      px[i + 1] = 190 + 60 * l;
-      px[i + 2] = 110 + 130 * l * l;
-      px[i + 3] = Math.min(255, Math.sqrt(l) * 330);
+      const m = Math.max(px[i], px[i + 1], px[i + 2]);
+      if (m === 0) {
+        px[i + 3] = 0;
+        continue;
+      }
+      const k = 255 / m;
+      px[i] = Math.min(255, px[i] * k);
+      px[i + 1] = Math.min(255, px[i + 1] * k);
+      px[i + 2] = Math.min(255, px[i + 2] * k);
+      px[i + 3] = Math.min(255, m * 1.15);
     }
     ctx.putImageData(data, 0, 0);
     this.lightsSource = c;
     this.refresh();
   }
 
-  private async loadCityPoints(): Promise<void> {
-    const res = await fetch(`${import.meta.env.BASE_URL}geo/city-lights.geojson`);
-    const fc = (await res.json()) as CityLights;
-    for (const f of fc.features) {
-      const [lon, lat] = f.geometry.coordinates;
-      Object.assign(f.properties, { lo: lon, sl: Math.sin(lat * DEG), cl: Math.cos(lat * DEG) });
-    }
-    (this.map.getSource('city-lights') as GeoJSONSource).setData(fc);
-    this.refresh();
-  }
-
-  /**
-   * L'opacité de chaque point dépend de la hauteur du soleil à cet endroit,
-   * calculée directement par MapLibre (expression), sans recalcul en JS par ville.
-   */
-  private updateCityPoints(sun: SubsolarPoint): void {
+  /** Opacité des calottes polaires : la hauteur du soleil au pôle vaut ± sa déclinaison. */
+  private updatePoles(sun: SubsolarPoint): void {
+    const a = Math.sin(SHADE_START * DEG);
+    const b = Math.sin(SHADE_FULL * DEG);
     const sd = Math.sin(sun.lat * DEG);
-    const cd = Math.cos(sun.lat * DEG);
-    const sinAlt: ExpressionSpecification = [
-      '+',
-      ['*', ['get', 'sl'], sd],
-      ['*', ['get', 'cl'], cd, ['cos', ['*', ['-', ['get', 'lo'], sun.lon], DEG]]],
-    ];
-    const nightness = (max: number): ExpressionSpecification => [
-      'interpolate',
-      ['linear'],
-      sinAlt,
-      Math.sin(LIGHTS_FULL * DEG),
-      max,
-      Math.sin(LIGHTS_ON * DEG),
-      0,
-    ];
-    // Fondu long et progressif : discret de loin (l'image NASA domine),
-    // puis les points prennent le relais en zoomant.
-    if (!this.map.getLayer('city-lights')) return;
-    this.map.setPaintProperty('city-lights', 'circle-opacity', [
-      'interpolate',
-      ['linear'],
-      ['zoom'],
-      2.5,
-      0,
-      4.5,
-      nightness(0.35),
-      7,
-      nightness(0.85),
-      11,
-      nightness(0.8),
-      14,
-      0,
-    ]);
+    for (const [pole, sinAlt] of [
+      ['north', sd],
+      ['south', -sd],
+    ] as const) {
+      const id = `night-pole-${pole}`;
+      if (!this.map.getLayer(id)) continue;
+      const alpha = Math.round(smooth((a - sinAlt) / (a - b)) * NIGHT_MAX_ALPHA * 100) / 100;
+      if (this.map.getPaintProperty(id, 'raster-opacity') !== alpha) this.map.setPaintProperty(id, 'raster-opacity', alpha);
+    }
   }
 
   /** Rues éclairées : intensité selon la nuit au centre de l'écran. */
   private updateStreets(): void {
-    if (this.map.getZoom() < 7.5 || !this.map.getLayer('night-streets')) return;
+    if (this.map.getZoom() < 8 || !this.map.getLayer('night-streets')) return;
     const c = this.map.getCenter();
     const sinAlt = sunAltitudeSin(c.lat, c.lng, this.sun);
     const t = smooth((Math.sin(LIGHTS_ON * DEG) - sinAlt) / (Math.sin(LIGHTS_ON * DEG) - Math.sin(LIGHTS_FULL * DEG)));
     const target = Math.round(t * 0.55 * 100) / 100;
     if (target === this.streetsAlpha) return;
     this.streetsAlpha = target;
-    this.map.setPaintProperty('night-streets', 'line-opacity', ['interpolate', ['linear'], ['zoom'], 8, 0, 11, target]);
+    this.map.setPaintProperty('night-streets', 'line-opacity', ['interpolate', ['linear'], ['zoom'], 8.8, 0, 10.5, target]);
   }
   private streetsAlpha = -1;
 
@@ -393,11 +373,6 @@ export class DayNight {
     src.play();
     src.pause();
   }
-}
-
-interface CityLights {
-  type: 'FeatureCollection';
-  features: { type: 'Feature'; geometry: { type: 'Point'; coordinates: [number, number] }; properties: Record<string, unknown> }[];
 }
 
 function smooth(t: number): number {
