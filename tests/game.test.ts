@@ -8,7 +8,8 @@ import { YEAR, marketValue } from '../src/game/economy';
 import { generateUsedListings, orderQuote } from '../src/game/fleet';
 import { playerFlights, setFlightSource } from '../src/game/flights';
 import { upgradeInfo } from '../src/game/hubs';
-import { summarize } from '../src/game/ledger';
+import { dailySeries, summarize } from '../src/game/ledger';
+import { GameClock } from '../src/core/clock';
 import { familyMinStars } from '../src/game/pilots';
 import { parseSave, serialize } from '../src/game/save';
 import { advance } from '../src/game/sim';
@@ -329,5 +330,39 @@ describe('sauvegarde', () => {
     const res = parseSave(JSON.stringify(raw));
     expect(res.ok).toBe(true);
     if (res.ok) expect(res.save.state.settings.autoMaintenance).toBe(true);
+  });
+});
+
+describe('graphiques jour par jour', () => {
+  it('relève chaque jour du mois et retombe sur le total du mois', () => {
+    const { ctx, t } = readyGame();
+    advance(ctx, t + 40 * DAY);
+    const nov = ctx.state.history.find((m) => m.month === '2026-11')!;
+    const days = dailySeries(nov);
+    expect(days.map((d) => d.d)).toEqual(Array.from({ length: 30 - 8 + 1 }, (_, i) => 8 + i));
+    const sum = (k: 'flights' | 'pax' | 'profit') => days.reduce((a, d) => a + d[k], 0);
+    expect(sum('flights')).toBe(nov.flights);
+    expect(sum('pax')).toBe(nov.pax);
+    expect(sum('profit')).toBeCloseTo(summarize(nov).profit, 2);
+    expect(days[days.length - 1].cash).toBeCloseTo(nov.cashEnd!, 2);
+    // Mois en cours : les jours finis + la journée en cours.
+    const today = new Date(ctx.state.time).getUTCDate();
+    const dec = dailySeries(ctx.state.ledger, { d: today, cash: ctx.state.cash });
+    expect(dec[dec.length - 1].d).toBe(today);
+    expect(dec.reduce((a, d) => a + d.flights, 0)).toBe(ctx.state.ledger.flights);
+  });
+});
+
+describe('horloge', () => {
+  it('« Maintenant » ne fait jamais reculer le temps du jeu', () => {
+    const ahead = Date.now() + 30 * DAY;
+    const clock = new GameClock(ahead, 10000);
+    clock.resetToRealTime();
+    expect(clock.now()).toBeGreaterThanOrEqual(ahead);
+    expect(clock.speed).toBe(1);
+    const behind = new GameClock(Date.now() - DAY, 0);
+    expect(behind.behindRealTime).toBe(true);
+    behind.resetToRealTime();
+    expect(Math.abs(behind.now() - Date.now())).toBeLessThan(5000);
   });
 });

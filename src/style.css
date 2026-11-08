@@ -75,10 +75,15 @@ body {
   white-space: nowrap;
 }
 
-.hud-date {
+.hud-date,
+.hud-date-short {
   color: var(--hud-muted);
   font-size: 13px;
   text-transform: capitalize;
+}
+
+.hud-date-short {
+  display: none;
 }
 
 .hud-clock {
@@ -124,6 +129,9 @@ body {
 @media (max-width: 520px) {
   .hud-date {
     display: none;
+  }
+  .hud-date-short {
+    display: inline;
   }
   .hud-btn {
     min-width: 34px;

@@ -1,12 +1,13 @@
 /**
  * Finances : trésorerie, résultat du mois détaillé, historique des mois
- * (graphique bénéfice / perte), banque (emprunts) et impôts.
+ * (graphiques par mesure, camemberts des dépenses et des recettes), banque (emprunts) et impôts.
  */
 import * as act from '../../../game/actions';
 import { BANKRUPTCY_DAYS, DAY, DOMESTIC_VAT_MAX, DOMESTIC_VAT_SHARE, FUEL_PRICE_START, loanRate } from '../../../game/config';
-import { INVEST_KEYS, LEDGER_LABEL, OPEX_KEYS, REVENUE_KEYS, monthLabel, summarize } from '../../../game/ledger';
+import { INVEST_KEYS, LEDGER_LABEL, OPEX_KEYS, REVENUE_KEYS, dailySeries, monthLabel, summarize, type DayPoint } from '../../../game/ledger';
 import type { MonthLedger } from '../../../game/state';
-import { btn, esc, kv, money, note, num, num1, section, signedMoneyHtml } from '../dom';
+import { btn, compact, esc, kv, money, note, num, num1, section, signedMoneyHtml } from '../dom';
+import { barChart, pieChart } from './charts';
 import type { Ui, View } from '../ui';
 
 const MONTHS_SHOWN = 12;
@@ -25,34 +26,102 @@ function ledgerRows(l: MonthLedger, keys: typeof OPEX_KEYS, sign: 1 | -1): strin
     .join('');
 }
 
-/**
- * Graphique du résultat net mois par mois : une colonne par mois, bleue au-dessus
- * de zéro (bénéfice), rouge en dessous (perte). Toucher une colonne affiche le
- * détail de ce mois.
- */
-function chart(months: MonthLedger[], selected: string): string {
-  const profits = months.map((m) => summarize(m).profit);
-  const max = Math.max(1, ...profits.map(Math.abs));
-  const hasNeg = profits.some((p) => p < 0);
-  const hasPos = profits.some((p) => p > 0);
-  // Ligne du zéro : en bas s'il n'y a que des bénéfices, en haut s'il n'y a que des pertes.
-  const zero = hasNeg && hasPos ? 50 : hasNeg ? 0 : 100;
-  const cols = months
-    .map((m, i) => {
-      const p = profits[i];
-      const h = (Math.abs(p) / max) * (hasNeg && hasPos ? 50 : 100);
-      const style = p >= 0 ? `bottom:${100 - zero}%;height:${h}%` : `top:${zero}%;height:${h}%`;
-      return `<button type="button" class="g-col${m.month === selected ? ' on' : ''}" data-a="month" data-id="${m.month}" aria-label="${esc(monthLabel(m.month))} : ${p >= 0 ? 'bénéfice' : 'perte'} ${esc(money(p))}">
-        <span class="g-col-plot"><span class="g-col-bar ${p >= 0 ? 'pos' : 'neg'}" style="${style}"></span></span>
-        <small>${shortMonth(m.month)}</small>
-      </button>`;
-    })
-    .join('');
-  return `<div class="g-chart" style="--zero:${zero}%">${cols}</div>`;
+type Metric = 'profit' | 'revenue' | 'cash' | 'flights' | 'pax' | 'cargo';
+type Period = 'months' | 'days';
+
+const METRICS: { id: Metric; chip: string; title: string; yLabel: string }[] = [
+  { id: 'profit', chip: '💰 Résultat', title: 'Résultat net (bénéfice ou perte)', yLabel: 'dollars US ($)' },
+  { id: 'revenue', chip: '💵 Recettes', title: 'Recettes (billets + fret)', yLabel: 'dollars US ($)' },
+  { id: 'cash', chip: '🏦 Trésorerie', title: 'Trésorerie en fin de période', yLabel: 'dollars US ($)' },
+  { id: 'flights', chip: '✈️ Vols', title: 'Nombre de vols effectués', yLabel: 'vols' },
+  { id: 'pax', chip: '👥 Passagers', title: 'Passagers transportés', yLabel: 'passagers' },
+  { id: 'cargo', chip: '📦 Fret', title: 'Fret transporté', yLabel: 'tonnes (t)' },
+];
+
+function fmtFor(m: Metric): { fmt: (v: number) => string; tick: (v: number) => string } {
+  if (m === 'flights') return { fmt: (v) => `${num(v)} vol${Math.abs(v) >= 2 ? 's' : ''}`, tick: compact };
+  if (m === 'pax') return { fmt: (v) => `${num(v)} passager${Math.abs(v) >= 2 ? 's' : ''}`, tick: compact };
+  if (m === 'cargo') return { fmt: (v) => `${num1(v)}\u202ft`, tick: (v) => `${compact(v)}\u202ft` };
+  return { fmt: (v) => (m === 'cash' ? money(v) : `${v > 0 ? '+' : ''}${money(v)}`), tick: money };
+}
+
+function monthValue(m: MonthLedger, metric: Metric, cashNow: number): number {
+  if (metric === 'profit') return summarize(m).profit;
+  if (metric === 'revenue') return summarize(m).revenue;
+  if (metric === 'cash') return m.cashEnd ?? cashNow;
+  if (metric === 'flights') return m.flights;
+  if (metric === 'pax') return m.pax;
+  return m.cargoT;
+}
+
+function dayValue(p: DayPoint, metric: Metric): number {
+  return metric === 'cargo' ? p.cargoT : p[metric];
+}
+
+/** Camembert des dépenses du mois (exploitation et impôt ; investissements en option). */
+function expensesPie(l: MonthLedger, withInvest: boolean): string {
+  const keys = [...OPEX_KEYS, 'tax' as const, ...(withInvest ? INVEST_KEYS : [])];
+  return pieChart(
+    keys.map((k) => ({ label: LEDGER_LABEL[k], value: l.entries[k] ?? 0 })),
+    money,
+    'Aucune dépense ce mois-ci.',
+  );
 }
 
 export function financesView(ui: Ui): View {
   let selected: string | null = null;
+  let metric: Metric = 'profit';
+  let period: Period = 'days';
+  let selectedDay: string | null = null;
+  let withInvest = false;
+  let revenueBy: 'source' | 'line' = 'line';
+  const charts = (months: MonthLedger[], shown: MonthLedger, isCurrent: boolean, now: number): string => {
+    const s = ui.game.state;
+    const m = METRICS.find((x) => x.id === metric)!;
+    const f = fmtFor(metric);
+    const chips = (items: [string, string, boolean][], action: string) =>
+      `<div class="g-chips g-chips-sm">${items.map(([id, label, on]) => `<button type="button" class="g-chip${on ? ' on' : ''}" data-a="${action}" data-id="${id}">${label}</button>`).join('')}</div>`;
+    let bars: string;
+    if (period === 'months') {
+      bars = barChart(
+        months.map((l) => ({ id: l.month, label: shortMonth(l.month), name: monthLabel(l.month), value: monthValue(l, metric, s.cash) })),
+        { action: 'month', selected, ...f, yLabel: m.yLabel, xLabel: 'mois (touche un mois pour son détail)', tone: metric === 'profit' || metric === 'cash' ? undefined : 'pos' },
+      );
+    } else {
+      const live = isCurrent ? { d: new Date(now).getUTCDate(), cash: s.cash } : undefined;
+      const series = dailySeries(shown, live);
+      const many = series.length > 10;
+      bars = series.length
+        ? barChart(
+            series.map((p) => ({
+              id: String(p.d),
+              label: !many || p.d === 1 || p.d % 5 === 0 ? String(p.d) : '',
+              name: `${p.d} ${monthLabel(shown.month)}${isCurrent && live && p.d === live.d ? ' (en cours)' : ''}`,
+              value: dayValue(p, metric),
+            })),
+            { action: 'day', selected: selectedDay, ...f, yLabel: m.yLabel, xLabel: `jours de ${monthLabel(shown.month)}`, tone: metric === 'profit' || metric === 'cash' ? undefined : 'pos' },
+          )
+        : `<p class="g-small">Pas de détail jour par jour pour ce mois (il date d’avant les relevés quotidiens).</p>`;
+    }
+    const lineRevenue = s.lines.map((l) => ({ label: `${l.hub} → ${l.dest}`, value: l.month.revenue }));
+    const byLine = isCurrent && revenueBy === 'line';
+    const revenuePie = byLine
+      ? pieChart(lineRevenue, money, 'Aucune recette ce mois-ci.')
+      : pieChart(REVENUE_KEYS.map((k) => ({ label: LEDGER_LABEL[k], value: shown.entries[k] ?? 0 })), money, 'Aucune recette ce mois-ci.');
+    return `
+      ${chips(METRICS.map((x) => [x.id, x.chip, x.id === metric]), 'metric')}
+      ${chips([['days', 'Jour par jour', period === 'days'], ['months', 'Mois par mois', period === 'months']], 'period')}
+      <h4 class="g-chart-title">${esc(m.title)}${period === 'days' ? ` · ${esc(monthLabel(shown.month))}` : ' · 12 derniers mois'}</h4>
+      ${bars}
+      ${metric === 'profit' || metric === 'cash' ? '<p class="g-small"><span class="g-key pos"></span> positif <span class="g-key neg"></span> négatif</p>' : ''}
+      <h4 class="g-chart-title">Où part l’argent · ${esc(monthLabel(shown.month))}</h4>
+      ${chips([['0', 'Dépenses courantes', !withInvest], ['1', '＋ investissements', withInvest]], 'invest')}
+      ${expensesPie(shown, withInvest)}
+      <h4 class="g-chart-title">D’où vient l’argent · ${esc(monthLabel(shown.month))}</h4>
+      ${isCurrent ? chips([['line', 'Par ligne', revenueBy === 'line'], ['source', 'Billets / fret', revenueBy === 'source']], 'revenueBy') : ''}
+      ${revenuePie}
+      <p class="g-small">Touche un mois dans « Mois par mois » pour voir ses graphiques et son détail.</p>`;
+  };
   return {
     tab: 'finances',
     live: true,
@@ -92,11 +161,7 @@ export function financesView(ui: Ui): View {
             ['Kérosène', `${s.fuelPrice.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} $/kg <small>(${fuelVsNormal >= 0 ? '+' : ''}${Math.round(fuelVsNormal * 100)}\u202f% par rapport à la normale)</small>`],
           ])}
         </div>
-        ${section(
-          'Résultat net par mois',
-          `${chart(months, selected)}
-           <p class="g-small"><span class="g-key pos"></span> bénéfice <span class="g-key neg"></span> perte · touche un mois pour son détail</p>`,
-        )}
+        ${section('Graphiques', charts(months, shown, isCurrent, now))}
         ${section(
           `${isCurrent ? 'Ce mois-ci' : 'Mois de'} ${esc(monthLabel(shown.month))}`,
           `<p class="g-small">${num(shown.flights)} vols · ${num(shown.pax)} passagers${shown.cargoT ? ` · ${num(shown.cargoT)} t de fret` : ''}</p>
@@ -138,8 +203,17 @@ export function financesView(ui: Ui): View {
       `;
     },
     action(a, el) {
-      if (a === 'month') {
-        selected = el.dataset.id!;
+      const id = el.dataset.id!;
+      if (a === 'metric' || a === 'period' || a === 'day' || a === 'invest' || a === 'revenueBy') {
+        if (a === 'metric') metric = id as Metric;
+        else if (a === 'period') period = id as Period;
+        else if (a === 'day') selectedDay = id;
+        else if (a === 'invest') withInvest = id === '1';
+        else revenueBy = id as 'source' | 'line';
+        ui.refresh(true);
+      } else if (a === 'month') {
+        selected = id;
+        selectedDay = null;
         ui.refresh(true);
       } else if (a === 'borrow') {
         ui.act(act.borrow, Number(el.dataset.id));

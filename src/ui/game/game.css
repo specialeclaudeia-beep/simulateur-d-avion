@@ -953,6 +953,140 @@ select.g-input option {
   color: var(--g-fg);
 }
 
+/* Graphiques : axes, lecture, camemberts */
+
+.g-chips-sm {
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.g-chips-sm .g-chip {
+  min-height: 36px;
+  padding: 6px 11px;
+  font-size: 13px;
+}
+
+.g-chart-title {
+  margin: 14px 0 4px;
+  font-size: 14px;
+  color: var(--g-fg);
+}
+
+.g-axis-y,
+.g-axis-x {
+  margin: 2px 0;
+  font-size: 11px;
+  color: var(--g-muted);
+}
+
+.g-axis-x {
+  text-align: right;
+}
+
+.g-plot {
+  display: flex;
+  gap: 6px;
+}
+
+.g-plot .g-chart {
+  flex: 1;
+  min-width: 0;
+}
+
+.g-ticks {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: calc(150px - 4px - 22px);
+  margin-top: 4px;
+  font-size: 10.5px;
+  color: var(--g-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.g-ticks span {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+  white-space: nowrap;
+}
+
+.g-readout {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.g-pie-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin: 8px 0;
+}
+
+.g-pie {
+  position: relative;
+  flex: none;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+}
+
+.g-pie-hole {
+  position: absolute;
+  inset: 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #0d1530;
+  font-size: 12px;
+  text-align: center;
+}
+
+.g-pie-hole small {
+  color: var(--g-muted);
+  font-size: 10.5px;
+}
+
+.g-pie-legend {
+  flex: 1;
+  min-width: 170px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+}
+
+.g-pie-legend li {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--g-line);
+}
+
+.g-pie-legend .g-key {
+  margin-left: 0;
+  flex: none;
+}
+
+.g-pie-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.g-pie-val {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.g-pie-val small {
+  color: var(--g-muted);
+}
+
 /* ───────────── Compagnie ───────────── */
 
 .g-company {

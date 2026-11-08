@@ -58,7 +58,7 @@ import {
   wearPerLeg,
 } from './economy';
 import { generateUsedListings } from './fleet';
-import { closeMonth, earn, spend } from './ledger';
+import { closeMonth, earn, snapDay, spend } from './ledger';
 import { generateCandidates, pilotName } from './pilots';
 import { randRange } from './rng';
 import { lineFrequency } from './schedule';
@@ -517,6 +517,7 @@ function onTrainingDone(ctx: Ctx, p: Pilot, t: number): void {
 /** Coûts fixes d'une journée, marchés, faillite. */
 function onDay(ctx: Ctx, t: number): void {
   const { state: s, data } = ctx;
+  snapDay(s, t);
 
   const salaries = s.pilots.reduce((sum, p) => sum + p.salary, 0) * (12 / 365);
   spend(s, 'salaries', salaries);

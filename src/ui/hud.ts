@@ -10,11 +10,12 @@ export function mountHud(root: HTMLElement, clock: GameClock, map: MapLibreMap, 
     <div class="hud-bar">
       <div class="hud-time" title="Heure du jeu">
         <span class="hud-date"></span>
+        <span class="hud-date-short"></span>
         <span class="hud-clock"></span>
         <span class="hud-utc"></span>
       </div>
       <div class="hud-speeds" role="group" aria-label="Vitesse du temps"></div>
-      <button class="hud-btn hud-now" type="button" title="Revenir à l'heure réelle">Maintenant</button>
+      <button class="hud-btn hud-now" type="button" title="Rattraper l'heure réelle (le jeu est en retard)" hidden>Maintenant</button>
       <button class="hud-btn hud-globe" type="button" title="Voir le globe entier" aria-label="Voir le globe entier">🌍</button>
     </div>
   `;
@@ -32,7 +33,8 @@ export function mountHud(root: HTMLElement, clock: GameClock, map: MapLibreMap, 
     buttons.set(s, b);
   }
 
-  root.querySelector('.hud-now')!.addEventListener('click', () => {
+  const nowBtn = root.querySelector<HTMLButtonElement>('.hud-now')!;
+  nowBtn.addEventListener('click', () => {
     clock.resetToRealTime();
     onTimeJump();
   });
@@ -41,9 +43,11 @@ export function mountHud(root: HTMLElement, clock: GameClock, map: MapLibreMap, 
   });
 
   const dateEl = root.querySelector<HTMLSpanElement>('.hud-date')!;
+  const dateShortEl = root.querySelector<HTMLSpanElement>('.hud-date-short')!;
   const clockEl = root.querySelector<HTMLSpanElement>('.hud-clock')!;
   const utcEl = root.querySelector<HTMLSpanElement>('.hud-utc')!;
   const dateFmt = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  const dateShortFmt = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
   const timeFmt = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const utcFmt = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
 
@@ -56,6 +60,10 @@ export function mountHud(root: HTMLElement, clock: GameClock, map: MapLibreMap, 
   const render = () => {
     const d = new Date(clock.now());
     dateEl.textContent = dateFmt.format(d);
+    dateShortEl.textContent = dateShortFmt.format(d);
+    // « Maintenant » ne sert qu'à rattraper l'heure réelle : jamais à revenir en arrière.
+    const behind = clock.behindRealTime;
+    if (nowBtn.hidden === behind) nowBtn.hidden = !behind;
     clockEl.textContent = timeFmt.format(d);
     utcEl.textContent = `${utcFmt.format(d)} UTC`;
     requestAnimationFrame(render);

@@ -44,9 +44,17 @@ export class GameClock {
     this.emit();
   }
 
-  /** Revient à l'heure réelle, vitesse ×1. */
+  /** Le temps du jeu est-il en retard sur l'heure réelle (de plus d'une minute) ? */
+  get behindRealTime(): boolean {
+    return this.now() < Date.now() - 60_000;
+  }
+
+  /**
+   * Revient à l'heure réelle, vitesse ×1. Ne fait jamais reculer le temps : si
+   * le jeu est en avance (après une accélération), il garde sa date et repasse à ×1.
+   */
   resetToRealTime(): void {
-    this.anchorGame = Date.now();
+    this.anchorGame = Math.max(this.now(), Date.now());
     this.anchorReal = performance.now();
     this._speed = 1;
     this.emit();
