@@ -71,7 +71,7 @@ export class NightLightsDetail {
         paint: {
           'raster-fade-duration': 0,
           'raster-resampling': 'linear',
-          'raster-opacity': ['interpolate', ['linear'], ['zoom'], MIN_ZOOM, 0, 4.2, 1, 7, 0.9, 8.5, 0.8, 10.2, 0],
+          'raster-opacity': ['interpolate', ['linear'], ['zoom'], MIN_ZOOM, 0, 4.2, 1, 6.5, 0.85, 8.5, 0.65, 10.2, 0],
         },
       },
       SLOT.night,
@@ -223,7 +223,7 @@ function extractLights(ctx: CanvasRenderingContext2D, w: number, h: number): voi
       px[i + 3] = 0;
       continue;
     }
-    const a = Math.min(1, v) ** 0.8;
+    const a = Math.min(1, v);
     // Couleur des lumières, légèrement réchauffée et éclaircie.
     px[i] = Math.min(255, r * 1.1 + 25);
     px[i + 1] = Math.min(255, g * 1.05 + 15);

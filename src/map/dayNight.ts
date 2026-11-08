@@ -112,6 +112,30 @@ export class DayNight {
       SLOT.night,
     );
 
+    // Calottes polaires : au-delà de 85° de latitude, le globe prolonge le bord
+    // des tuiles jusqu'au pôle, mais pas l'ombre (image hors tuiles). Deux petites
+    // tuiles transparentes dont seule la rangée du bord est colorée « nuit »
+    // assombrissent ces calottes ; leur opacité suit la nuit au pôle.
+    for (const pole of ['north', 'south'] as const) {
+      map.addSource(`night-pole-${pole}`, {
+        type: 'raster',
+        tiles: [new URL(`${import.meta.env.BASE_URL}geo/pole-${pole}.png`, location.href).href],
+        tileSize: 256,
+        minzoom: 0,
+        maxzoom: 0,
+      });
+      map.addLayer(
+        {
+          id: `night-pole-${pole}`,
+          type: 'raster',
+          source: `night-pole-${pole}`,
+          maxzoom: 6,
+          paint: { 'raster-fade-duration': 0, 'raster-opacity': 0, 'raster-resampling': 'nearest' },
+        },
+        SLOT.night,
+      );
+    }
+
     map.addSource('night-lights', { type: 'canvas', canvas: this.lightsCanvas, coordinates: COORDS, animate: false });
     map.addLayer(
       {
@@ -198,6 +222,7 @@ export class DayNight {
       this.shadeLon = sun.lon;
       this.uploadCanvas('night-shade');
       this.updateStreets();
+      this.updatePoles(sun);
     }
 
     // Lumières : grande image, donc un peu moins souvent.
@@ -310,6 +335,22 @@ export class DayNight {
     ctx.putImageData(data, 0, 0);
     this.lightsSource = c;
     this.refresh();
+  }
+
+  /** Opacité des calottes polaires : la hauteur du soleil au pôle vaut ± sa déclinaison. */
+  private updatePoles(sun: SubsolarPoint): void {
+    const a = Math.sin(SHADE_START * DEG);
+    const b = Math.sin(SHADE_FULL * DEG);
+    const sd = Math.sin(sun.lat * DEG);
+    for (const [pole, sinAlt] of [
+      ['north', sd],
+      ['south', -sd],
+    ] as const) {
+      const id = `night-pole-${pole}`;
+      if (!this.map.getLayer(id)) continue;
+      const alpha = Math.round(smooth((a - sinAlt) / (a - b)) * NIGHT_MAX_ALPHA * 100) / 100;
+      if (this.map.getPaintProperty(id, 'raster-opacity') !== alpha) this.map.setPaintProperty(id, 'raster-opacity', alpha);
+    }
   }
 
   /** Rues éclairées : intensité selon la nuit au centre de l'écran. */
