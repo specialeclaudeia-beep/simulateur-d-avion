@@ -9,7 +9,7 @@
  *   mémoire : le service worker le sert ainsi depuis sa copie, hors connexion
  *   (un lecteur audio qui demande des « morceaux de fichier » ne serait pas
  *   servi correctement par la copie gardée).
- * - Réglages (son coupé, volume) gardés dans ce navigateur, hors sauvegarde.
+ * - Réglages (son coupé, volumes de la musique et des bruitages) gardés dans ce navigateur, hors sauvegarde.
  */
 
 export interface Track {
@@ -24,14 +24,21 @@ export const TRACKS: Track[] = [
 ];
 
 const STORAGE_KEY = 'simulateur-compagnie:son';
-/** Volume au premier lancement (0 à 1). */
+/** Volumes au premier lancement (0 à 1). */
 const DEFAULT_VOLUME = 0.5;
+const DEFAULT_FX = 0.7;
 /** Fondu à la reprise et à la coupure (ms). */
 const FADE_MS = 600;
 
 interface SoundSettings {
+  /** Tout le son (musique et bruitages). */
   on: boolean;
+  /** Volume de la musique. */
   volume: number;
+  /** Volume des bruitages (avions, interface). */
+  fx: number;
+  /** Sons de l'interface (touches, messages…). */
+  ui: boolean;
 }
 
 function loadSettings(): SoundSettings {
@@ -39,11 +46,17 @@ function loadSettings(): SoundSettings {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as Partial<SoundSettings> | null;
     return {
       on: raw?.on ?? true,
-      volume: typeof raw?.volume === 'number' ? Math.min(1, Math.max(0, raw.volume)) : DEFAULT_VOLUME,
+      volume: typeof raw?.volume === 'number' ? clamp01(raw.volume) : DEFAULT_VOLUME,
+      fx: typeof raw?.fx === 'number' ? clamp01(raw.fx) : DEFAULT_FX,
+      ui: raw?.ui ?? true,
     };
   } catch {
-    return { on: true, volume: DEFAULT_VOLUME };
+    return { on: true, volume: DEFAULT_VOLUME, fx: DEFAULT_FX, ui: true };
   }
+}
+
+function clamp01(v: number): number {
+  return Math.min(1, Math.max(0, v));
 }
 
 class Music {
@@ -87,6 +100,10 @@ class Music {
     return this.settings.volume;
   }
 
+  get fxVolume(): number {
+    return this.settings.fx;
+  }
+
   get playing(): boolean {
     return !this.audio.paused;
   }
@@ -104,12 +121,28 @@ class Music {
   }
 
   setVolume(volume: number): void {
-    this.settings.volume = Math.min(1, Math.max(0, volume));
+    this.settings.volume = clamp01(volume);
     this.save();
     if (this.playing) {
       window.clearInterval(this.fadeTimer);
       this.audio.volume = this.settings.volume;
     }
+  }
+
+  get uiOn(): boolean {
+    return this.settings.ui;
+  }
+
+  setUiOn(on: boolean): void {
+    this.settings.ui = on;
+    this.save();
+    this.emit();
+  }
+
+  setFxVolume(volume: number): void {
+    this.settings.fx = clamp01(volume);
+    this.save();
+    this.emit();
   }
 
   /** Passe au morceau suivant (et le joue si la musique est allumée). */

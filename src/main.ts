@@ -13,6 +13,9 @@ import { mountGame } from './ui/game';
 import { setupPwa } from './pwa';
 import { music } from './audio/music';
 import { mountSoundToggle } from './ui/soundToggle';
+import { mountFlightSounds } from './audio/flightSounds';
+import { setupAudioEngine } from './audio/engine';
+import { mountUiSounds } from './audio/uiSounds';
 
 async function start(): Promise<void> {
   const clock = new GameClock();
@@ -36,6 +39,7 @@ async function start(): Promise<void> {
   mountFlightCard(document.body, aircraft, clock);
   mountTrafficToggle(document.body, aircraft);
   mountSoundToggle(document.body);
+  mountFlightSounds(aircraft, clock);
 
   // Accès pratique depuis la console du navigateur pour tester.
   Object.assign(window, { map, clock, countries, aircraft, music });
@@ -47,6 +51,9 @@ async function start(): Promise<void> {
 setupPwa();
 // Musique de fond : démarre au premier toucher de l'écran.
 music.setup();
+// Bruitages (avions et interface) : prêts au premier toucher, eux aussi.
+setupAudioEngine();
+mountUiSounds();
 
 start().catch((err: unknown) => {
   console.error(err);

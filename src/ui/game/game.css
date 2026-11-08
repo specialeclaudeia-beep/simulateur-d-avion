@@ -1475,6 +1475,10 @@ body.wizard-on .country-card {
   margin: 8px 0;
 }
 
+.g-volume > span {
+  min-width: 5.5em;
+}
+
 .g-volume input[type='range'] {
   flex: 1;
   accent-color: var(--g-accent);

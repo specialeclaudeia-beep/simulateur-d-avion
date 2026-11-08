@@ -1,6 +1,7 @@
 import type { GameClock } from '../core/clock';
 import type { AircraftLayer } from '../map/aircraft';
 import type { Flight } from '../flights/types';
+import { LISTEN_POINTS, listenPoint, nextListenPoint } from '../audio/flightSounds';
 
 /**
  * Fiche de l'avion touché : compagnie, numéro de vol, départ → arrivée,
@@ -38,6 +39,7 @@ export function mountFlightCard(root: HTMLElement, layer: AircraftLayer, clock: 
           <strong>${esc(f.callsign)}</strong>
           <small>${esc(f.airlineName)}${f.player ? ' · ta compagnie' : ''}</small>
         </div>
+        <button type="button" class="hud-btn fc-cabin" title="Changer d’endroit d’écoute : dehors, cabine, cockpit"></button>
         <button type="button" class="hud-btn fc-follow" title="La caméra suit l'avion" aria-pressed="false">🎯 Suivre</button>
         <button type="button" class="hud-btn fc-close" aria-label="Fermer">✕</button>
       </div>
@@ -64,6 +66,10 @@ export function mountFlightCard(root: HTMLElement, layer: AircraftLayer, clock: 
       <div class="fc-load" title="Remplissage"><div style="width:${Math.round(ratio * 100)}%"></div></div>
     `;
     card.querySelector('.fc-close')!.addEventListener('click', () => layer.clearSelection());
+    card.querySelector('.fc-cabin')!.addEventListener('click', () => {
+      nextListenPoint();
+      refresh();
+    });
     card.querySelector('.fc-follow')!.addEventListener('click', () => layer.follow(!layer.isFollowing));
     const img = card.querySelector<HTMLImageElement>('.fc-logo');
     img?.addEventListener('error', () => img.replaceWith(Object.assign(document.createElement('span'), { className: 'fc-dot' })));
@@ -85,6 +91,13 @@ export function mountFlightCard(root: HTMLElement, layer: AircraftLayer, clock: 
     const h = Math.floor(left / 3_600_000);
     const m = Math.floor((left % 3_600_000) / 60_000);
     set('.fc-eta', left > 0 ? `dans ${h ? `${h} h ` : ''}${m} min` : 'posé');
+    const cabin = card.querySelector<HTMLButtonElement>('.fc-cabin');
+    if (cabin) {
+      const p = LISTEN_POINTS.find((x) => x.id === listenPoint())!;
+      const html = `${p.icon}<span class="fc-cabin-label"> ${p.label}</span>`;
+      if (cabin.innerHTML !== html) cabin.innerHTML = html;
+      cabin.setAttribute('aria-label', `Écoute : ${p.label}`);
+    }
     const follow = card.querySelector<HTMLButtonElement>('.fc-follow');
     if (follow) {
       follow.classList.toggle('active', layer.isFollowing);

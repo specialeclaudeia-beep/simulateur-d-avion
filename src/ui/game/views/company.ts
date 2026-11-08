@@ -94,8 +94,11 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
         )}
         ${section(
           'Son',
-          `<label class="g-toggle"><input type="checkbox" data-in="musicOn"${music.on ? ' checked' : ''}><span>Musique</span></label>
-           <label class="g-volume"><span>Volume</span><input type="range" min="0" max="100" step="5" value="${Math.round(music.volume * 100)}" data-in="musicVolume" aria-label="Volume de la musique"></label>
+          `<label class="g-toggle"><input type="checkbox" data-in="musicOn"${music.on ? ' checked' : ''}><span>Son (musique et bruitages)</span></label>
+           <label class="g-volume"><span>Musique</span><input type="range" min="0" max="100" step="5" value="${Math.round(music.volume * 100)}" data-in="musicVolume" aria-label="Volume de la musique"></label>
+           <label class="g-volume"><span>Bruitages</span><input type="range" min="0" max="100" step="5" value="${Math.round(music.fxVolume * 100)}" data-in="fxVolume" aria-label="Volume des bruitages"></label>
+           <label class="g-toggle"><input type="checkbox" data-in="uiSounds"${music.uiOn ? ' checked' : ''}><span>Sons des boutons et des messages</span></label>
+           <p class="g-small">Touche un avion sur la carte pour l’entendre, du décollage à l’atterrissage ; dans sa fiche, le bouton 🎧 change d’endroit : dehors, cabine ou cockpit.</p>
            <p class="g-small">${music.on ? `${music.playing ? '♪ En cours' : 'Prochain morceau'} : <b>${esc(music.track.title)}</b>` : 'Musique coupée.'}</p>
            ${btn('⏭ Morceau suivant', 'nextTrack', { cls: 'ghost' })}`,
         )}
@@ -121,13 +124,18 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
         void importSave(ui, el as HTMLInputElement, hooks);
         return;
       }
-      if (key === 'musicVolume') {
-        music.setVolume(Number(el.value) / 100);
+      if (key === 'musicVolume' || key === 'fxVolume') {
+        if (key === 'musicVolume') music.setVolume(Number(el.value) / 100);
+        else music.setFxVolume(Number(el.value) / 100);
         return;
       }
       if (!final) return;
       if (key === 'musicOn') {
         music.setOn((el as HTMLInputElement).checked);
+        return;
+      }
+      if (key === 'uiSounds') {
+        music.setUiOn((el as HTMLInputElement).checked);
         return;
       }
       if (key === 'maintenanceThreshold') ui.act(act.updateSettings, { maintenanceThreshold: Number(el.value) });
