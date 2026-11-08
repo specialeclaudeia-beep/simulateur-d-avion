@@ -1,0 +1,195 @@
+:root {
+  --hud-bg: rgba(8, 14, 32, 0.78);
+  --hud-fg: #e9eefb;
+  --hud-muted: #9fb0d6;
+  --accent: #4da3ff;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  /* L'espace autour du globe : nuit étoilée. */
+  background: radial-gradient(ellipse at 50% 40%, #0d1838 0%, #050914 60%, #02040a 100%);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--hud-fg);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+#map {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(1px 1px at 12% 22%, #fff9 50%, transparent 51%),
+    radial-gradient(1px 1px at 72% 12%, #fff8 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 85% 65%, #fffa 50%, transparent 51%),
+    radial-gradient(1px 1px at 33% 80%, #fff7 50%, transparent 51%),
+    radial-gradient(1px 1px at 55% 45%, #fff6 50%, transparent 51%),
+    radial-gradient(1px 1px at 92% 30%, #fff8 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 6% 60%, #fff9 50%, transparent 51%),
+    radial-gradient(1px 1px at 46% 6%, #fff7 50%, transparent 51%),
+    radial-gradient(1px 1px at 22% 48%, #fff6 50%, transparent 51%),
+    radial-gradient(1px 1px at 64% 90%, #fff8 50%, transparent 51%);
+  background-size: 360px 360px;
+}
+
+#hud {
+  position: fixed;
+  top: max(8px, env(safe-area-inset-top));
+  left: 8px;
+  right: 8px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.hud-bar {
+  pointer-events: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 10px;
+  padding: 6px 10px;
+  border-radius: 14px;
+  background: var(--hud-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  max-width: 100%;
+}
+
+.hud-time {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hud-date {
+  color: var(--hud-muted);
+  font-size: 13px;
+  text-transform: capitalize;
+}
+
+.hud-clock {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.hud-utc {
+  color: var(--hud-muted);
+  font-size: 12px;
+}
+
+.hud-speeds {
+  display: flex;
+  gap: 3px;
+}
+
+.hud-btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--hud-fg);
+  font: inherit;
+  font-size: 13px;
+  min-width: 38px;
+  min-height: 34px; /* cible tactile confortable */
+  padding: 4px 8px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.hud-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.hud-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #04122a;
+  font-weight: 700;
+}
+
+@media (max-width: 520px) {
+  .hud-date {
+    display: none;
+  }
+  .hud-btn {
+    min-width: 34px;
+    padding: 4px 6px;
+    font-size: 12px;
+  }
+}
+
+.fatal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  padding: 24px;
+  line-height: 1.6;
+  background: #050914;
+  z-index: 100;
+}
+
+/* Contrôles MapLibre un peu plus gros sur mobile. */
+.maplibregl-ctrl-group button {
+  width: 36px;
+  height: 36px;
+}
+
+.country-card {
+  position: fixed;
+  left: 50%;
+  bottom: calc(52px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px 8px 14px;
+  border-radius: 14px;
+  background: var(--hud-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  z-index: 10;
+  max-width: calc(100% - 140px);
+}
+
+.country-card[hidden] {
+  display: none;
+}
+
+.country-flag {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.country-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.country-text strong {
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.country-text small {
+  color: var(--hud-muted);
+}
