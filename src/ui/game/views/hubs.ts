@@ -178,7 +178,7 @@ export function hubView(ui: Ui, iata: string): View {
           return;
         case 'sell': {
           void ui
-            .confirm({ title: 'Vendre ce hub ?', text: `Tu récupères ${money(hubResale(h))} (${Math.round(HUB_RESALE * 100)} % de ce que tu y as mis).`, ok: 'Vendre', danger: true })
+            .confirm({ title: 'Vendre ce hub ?', text: `Tu récupères ${money(hubResale(h))} (${Math.round(HUB_RESALE * 100)}\u202f% de ce que tu y as mis).`, ok: 'Vendre', danger: true })
             .then((yes) => {
               if (yes && ui.act(act.sellHub, iata)) ui.back();
             });
@@ -211,7 +211,7 @@ function hubCatalogView(ui: Ui): View {
         .join('');
       return `
         <label class="g-field"><span>Pays</span><select class="g-input" data-in="country">${options}</select></label>
-        ${foreign ? note('Hors de ton pays, un hub coûte 25 % de plus (droits de trafic).', 'info') : ''}
+        ${foreign ? note('Hors de ton pays, un hub coûte 25\u202f% de plus (droits de trafic).', 'info') : ''}
         <input class="g-input" type="search" data-in="search" placeholder="Rechercher une ville, un aéroport…" value="${esc(search)}">
         <div class="g-list">${shown.map((a) => airportRow(ui, a)).join('') || empty('Aucun aéroport ne correspond.')}</div>
         ${list.length > shown.length ? `<p class="g-small">… et ${list.length - shown.length} autres : précise ta recherche.</p>` : ''}

@@ -82,7 +82,7 @@ export function linesView(ui: Ui): View {
             sub: served
               ? `${served} avion(s) · ${perDay.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} vol(s)/jour · ce mois : ${m.flights ? `remplissage ${pct(load)}, marge ${signedMoneyHtml(m.revenue - m.costs)}` : 'pas encore de vol'}`
               : `${badge('Sans avion', 'warn')} ${num(l.km)} km`,
-            right: `${Math.round(l.priceFactor * 100)} %`,
+            right: `${Math.round(l.priceFactor * 100)}\u202f%`,
           });
         })
         .join('');
@@ -218,7 +218,8 @@ function linePreviewView(ui: Ui, hub: string, dest: string): View {
       const three = expectedPax(ui, fake, 3);
       const fare = referenceFare(d, A, B, route.km);
       const vat = domesticVatRate(d, s, A, B);
-      const fleetOk = s.aircraft.filter((ac) => ac.base === hub && !routeProblem(d, d.model(ac.modelId), A, B, route.km));
+      const based = s.aircraft.filter((ac) => ac.base === hub);
+      const fleetOk = based.filter((ac) => !routeProblem(d, d.model(ac.modelId), A, B, route.km));
       const cost = act.lineOpeningCost(route.km);
       const h = s.hubs.find((x) => x.iata === hub)!;
       const full = s.lines.filter((l) => l.hub === hub).length >= h.lineSlots;
@@ -233,7 +234,13 @@ function linePreviewView(ui: Ui, hub: string, dest: string): View {
             ['Ouverture', money(cost)],
           ])}
         </div>
-        ${fleetOk.length ? note(`${fleetOk.length} de tes avions basés ici peuvent voler sur cette ligne.`, 'good') : note('Aucun de tes avions basés ici ne peut encore la desservir : il en faudra un avec assez de rayon d’action.', 'info')}
+        ${
+          fleetOk.length
+            ? note(`${fleetOk.length} de tes avions basés ici peuvent voler sur cette ligne.`, 'good')
+            : based.length
+              ? note('Aucun de tes avions basés ici ne peut la desservir : il en faudra un avec assez de rayon d’action.', 'info')
+              : note('Pas encore d’avion basé ici : tu en achèteras un juste après.', 'info')
+        }
         ${full ? note('Plus de licence de ligne libre à ce hub.', 'warn') : ''}
         ${btn(`Ouvrir la ligne · ${money(cost)}`, 'open', { disabled: full || cost > s.cash })}
       `;
@@ -301,7 +308,7 @@ export function lineView(ui: Ui, id: string): View {
           'Prix du billet',
           `<div class="g-price-box">
             <b class="g-price" data-live="fare">${money(fare * l.priceFactor)}</b>
-            <span data-live="factor">${Math.round(l.priceFactor * 100)} % du prix habituel (${money(fare)})</span>
+            <span data-live="factor">${Math.round(l.priceFactor * 100)}\u202f% du prix habituel (${money(fare)})</span>
           </div>
           <input class="g-range" type="range" data-in="price" min="${PRICE_FACTOR_MIN * 100}" max="${PRICE_FACTOR_MAX * 100}" step="5" value="${Math.round(l.priceFactor * 100)}" aria-label="Prix du billet">
           <p class="g-small">Moins cher : plus de passagers. Plus cher : plus de recette par passager mais des sièges vides.</p>
@@ -328,7 +335,7 @@ export function lineView(ui: Ui, id: string): View {
       const fare = referenceFare(d, d.airport(l.hub), d.airport(l.dest), l.km);
       const body = el.closest('.g-body')!;
       body.querySelector('[data-live=fare]')!.textContent = money(fare * factor);
-      body.querySelector('[data-live=factor]')!.textContent = `${Math.round(factor * 100)} % du prix habituel (${money(fare)})`;
+      body.querySelector('[data-live=factor]')!.textContent = `${Math.round(factor * 100)}\u202f% du prix habituel (${money(fare)})`;
       const est = body.querySelector('[data-live=estimate]');
       if (est && est.textContent) {
         const f = lineFrequency(ui.ctx, l.id);

@@ -139,14 +139,15 @@ export function monthLabel(key: string): string {
   return `${MONTHS[m - 1]} ${y}`;
 }
 
+/** Montant lisible (« 12,5 M$ ») ; l'espace avant l'unité est insécable : jamais de « M$ » seul en début de ligne. */
 export function money(v: number): string {
   const a = Math.abs(v);
   const sign = v < 0 ? '−' : '';
   const fmt = (x: number, d: number) => x.toLocaleString('fr-FR', { maximumFractionDigits: d, minimumFractionDigits: 0 });
-  if (a >= 1e9) return `${sign}${fmt(a / 1e9, 2)} Md$`;
-  if (a >= 1e6) return `${sign}${fmt(a / 1e6, a >= 1e8 ? 0 : 1)} M$`;
-  if (a >= 1e4) return `${sign}${fmt(a / 1e3, 0)} k$`;
-  return `${sign}${fmt(a, 0)} $`;
+  if (a >= 1e9) return `${sign}${fmt(a / 1e9, 2)}\u202fMd$`;
+  if (a >= 1e6) return `${sign}${fmt(a / 1e6, a >= 1e8 ? 0 : 1)}\u202fM$`;
+  if (a >= 1e4) return `${sign}${fmt(a / 1e3, 0)}\u202fk$`;
+  return `${sign}${fmt(a, 0)}\u202f$`;
 }
 
 export function signedMoney(v: number): string {

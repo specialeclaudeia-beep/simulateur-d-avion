@@ -72,7 +72,7 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
         ${section(
           'Réglages',
           `<label class="g-toggle"><input type="checkbox" data-in="autoMaintenance"${st.autoMaintenance ? ' checked' : ''}><span>Révision automatique au hub quand l’état passe sous
-             <select class="g-input inline" data-in="maintenanceThreshold">${[40, 50, 60, 70, 80].map((v) => `<option value="${v}"${v === st.maintenanceThreshold ? ' selected' : ''}>${v} %</option>`).join('')}</select></span></label>
+             <select class="g-input inline" data-in="maintenanceThreshold">${[40, 50, 60, 70, 80].map((v) => `<option value="${v}"${v === st.maintenanceThreshold ? ' selected' : ''}>${v}\u202f%</option>`).join('')}</select></span></label>
            <label class="g-toggle"><input type="checkbox" data-in="autoRepair"${st.autoRepair ? ' checked' : ''}><span>Réparer automatiquement les pannes</span></label>
            <label class="g-toggle"><input type="checkbox" data-in="offlineProgress"${st.offlineProgress ? ' checked' : ''}><span>Le temps continue quand le jeu est fermé (jusqu’à 7 jours, à vitesse réelle)</span></label>`,
         )}

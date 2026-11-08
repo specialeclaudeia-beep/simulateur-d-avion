@@ -69,7 +69,11 @@ export function namePoolFor(country: string, continent: string | undefined): str
 
 export function randomName(rng: Rng, pool: string): { firstName: string; lastName: string } {
   const p = POOLS[pool] ?? POOLS.en;
-  return { firstName: pick(rng, p.first), lastName: pick(rng, p.last) };
+  const firstName = pick(rng, p.first);
+  let lastName = pick(rng, p.last);
+  // Certains prénoms sont aussi des noms de famille : pas de « Thomas Thomas ».
+  for (let i = 0; i < 5 && lastName === firstName; i++) lastName = pick(rng, p.last);
+  return { firstName, lastName };
 }
 
 // ───────────────────────── Immatriculations ─────────────────────────

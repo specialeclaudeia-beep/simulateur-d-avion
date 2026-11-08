@@ -394,7 +394,7 @@ function arrive(ctx: Ctx, ac: Aircraft, t: number): void {
     if (stars > pilot.stars) {
       pilot.stars = stars;
       pilot.salary = Math.round((pilot.salary * (1 + PILOT_RAISE)) / 100) * 100;
-      log(ctx, 'good', `${pilotName(pilot)} passe pilote ${stars} étoiles (salaire +${Math.round(PILOT_RAISE * 100)} %)`, { type: 'pilot', id: pilot.id }, t);
+      log(ctx, 'good', `${pilotName(pilot)} passe pilote ${stars} étoiles (salaire +${Math.round(PILOT_RAISE * 100)}\u202f%)`, { type: 'pilot', id: pilot.id }, t);
     }
   }
 

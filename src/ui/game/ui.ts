@@ -292,7 +292,7 @@ export class Ui {
     const key = JSON.stringify(s.company.logo) + s.company.code;
     if (key !== this.logoKey) {
       this.logoKey = key;
-      this.logoEl.innerHTML = logoHtml(s.company.logo, s.company.code, 30);
+      this.logoEl.innerHTML = logoHtml(s.company.logo, s.company.code, 26);
       this.nav.style.setProperty('--company', s.company.color);
     }
     for (const [id, fn] of this.badges) {
@@ -410,6 +410,12 @@ export class Ui {
       s = Math.min(s, a.lat);
       n = Math.max(n, a.lat);
     }
+    // MapLibre ajoute les marges déjà posées sur la carte à celles demandées ici
+    // (et, sur le globe, ignore les marges « absolues ») : on remet d'abord les
+    // marges de la carte à zéro, sans bouger l'image, puis on cadre.
+    const canvas = this.map.getCanvas();
+    const middle = this.map.unproject([canvas.clientWidth / 2, canvas.clientHeight / 2]);
+    this.map.jumpTo({ center: middle, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
     this.map.fitBounds(
       [
         [w, s],
@@ -451,13 +457,19 @@ function modal(html: string, setup?: (box: HTMLElement) => void): Promise<string
 
 // ───────────────────────── Mise en page ─────────────────────────
 
-/** Marges à laisser libres sur la carte autour du panneau ouvert. */
+/**
+ * Marges à laisser libres sur la carte : la barre du temps en haut, et le
+ * panneau ouvert (en bas sur téléphone, à droite sur ordinateur), mesuré tel
+ * qu'il est affiché.
+ */
 export function mapPadding(base = 40): { top: number; bottom: number; left: number; right: number } {
-  const wide = window.innerWidth >= 900;
-  const sheetOpen = document.body.classList.contains('sheet-open') || document.body.classList.contains('wizard-on');
+  const W = window.innerWidth;
+  const H = window.innerHeight;
   const hud = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hud-h')) || 60;
-  if (wide) return { top: hud + base, bottom: 90 + base, left: base, right: (sheetOpen ? 440 : 0) + base };
-  const bottom = sheetOpen ? window.innerHeight * 0.6 : 80;
+  const sheet = document.querySelector<HTMLElement>('.g-sheet:not([hidden])')?.getBoundingClientRect();
+  if (W >= 900) return { top: hud + base, bottom: 90 + base, left: base, right: (sheet ? W - sheet.left : 0) + base };
+  // Toujours au moins 140 px de carte visible, même panneau agrandi.
+  const bottom = Math.min(sheet ? H - sheet.top : 80, H - hud - 140);
   return { top: hud + base / 2, bottom: bottom + base / 2, left: base / 2, right: base / 2 };
 }
 

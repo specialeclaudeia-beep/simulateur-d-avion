@@ -3,11 +3,11 @@
  * recrutement de pilotes expérimentés et formation de débutants.
  */
 import * as act from '../../../game/actions';
-import { MIN_STARS, PILOT_SEVERANCE_MONTHS, TRAINING_DAYS } from '../../../game/config';
+import { PILOT_SEVERANCE_MONTHS, PILOT_SIGNING_MONTHS, TRAINING_DAYS } from '../../../game/config';
 import { pilotProblem } from '../../../game/economy';
-import { trainingCost, typeRatingSpec } from '../../../game/pilots';
+import { familyMinStars, trainingCost, typeRatingSpec } from '../../../game/pilots';
 import type { Pilot } from '../../../game/state';
-import { badge, btn, dateLong, empty, esc, flagEmoji, kv, money, note, num, row, section, stars, when } from '../dom';
+import { badge, btn, dateLong, empty, esc, flagEmoji, kv, money, note, num, num1, row, section, stars, when } from '../dom';
 import type { Ui, View } from '../ui';
 import { aircraftName, pilotFullName } from './common';
 import { aircraftView } from './fleet';
@@ -219,21 +219,25 @@ export function hireView(ui: Ui): View {
       const d = ui.game.data;
       const mine = fleetFamilies(ui);
       const needs = [...mine].map((f) => {
-        const big = d.families.get(f)?.models.reduce((m, x) => Math.max(m, MIN_STARS[x.category] ?? 1), 1) ?? 1;
+        const fam = d.families.get(f);
+        const big = fam ? familyMinStars(fam) : 1;
         return `${esc(f)}${big > 1 ? ` (${big}★ min.)` : ''}`;
       });
-      const cards = s.market.pilots
+      const useful = (c: { ratings: string[] }) => c.ratings.some((r) => mine.has(r));
+      // Ceux qui peuvent voler sur la flotte d'abord.
+      const cards = [...s.market.pilots]
+        .sort((a, b) => Number(useful(b)) - Number(useful(a)))
         .map((c) => {
-          const useful = c.ratings.some((r) => mine.has(r));
-          return `<div class="g-card g-listing${useful ? ' good' : ''}">
+          const fits = useful(c);
+          return `<div class="g-card g-listing${fits ? ' good' : ''}">
             <p class="g-title-line"><span class="g-flag">${flagEmoji(c.nationality)}</span> <b>${esc(pilotFullName(c))}</b> ${stars(c.stars)}</p>
-            <p class="g-small">${num(c.hours)} h de vol · qualifié(e) ${esc(c.ratings.join(', '))}${useful ? ` · ${badge('vole sur ta flotte', 'ok')}` : ''}</p>
+            <p class="g-small">${num(c.hours)} h de vol · qualifié(e) ${esc(c.ratings.join(', '))}${fits ? ` · ${badge('vole sur ta flotte', 'ok')}` : ''}</p>
             <div class="g-listing-foot"><span>${money(c.salary)}<small>/mois</small></span>${btn(`Embaucher · ${money(c.signingFee)}`, 'hire', { id: c.id, cls: 'small', disabled: c.signingFee > s.cash })}</div>
           </div>`;
         })
         .join('');
       return `
-        <p class="g-small">${needs.length ? `Ta flotte vole sur : <b>${needs.join(', ')}</b>.` : 'Achète d’abord un avion pour savoir quelle qualification chercher.'} Prime d’embauche : 1,5 mois de salaire. Nouveaux candidats chaque semaine.</p>
+        <p class="g-small">${needs.length ? `Ta flotte vole sur : <b>${needs.join(', ')}</b>.` : 'Achète d’abord un avion pour savoir quelle qualification chercher.'} Prime d’embauche : ${num1(PILOT_SIGNING_MONTHS)} mois de salaire. Nouveaux candidats chaque semaine.</p>
         ${cards || empty('Plus de candidat cette semaine.')}
       `;
     },

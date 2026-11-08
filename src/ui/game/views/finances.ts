@@ -6,7 +6,7 @@ import * as act from '../../../game/actions';
 import { BANKRUPTCY_DAYS, DAY, DOMESTIC_VAT_MAX, DOMESTIC_VAT_SHARE, FUEL_PRICE_START, loanRate } from '../../../game/config';
 import { INVEST_KEYS, LEDGER_LABEL, OPEX_KEYS, REVENUE_KEYS, monthLabel, summarize } from '../../../game/ledger';
 import type { MonthLedger } from '../../../game/state';
-import { btn, esc, kv, money, note, num, section, signedMoneyHtml } from '../dom';
+import { btn, esc, kv, money, note, num, num1, section, signedMoneyHtml } from '../dom';
 import type { Ui, View } from '../ui';
 
 const MONTHS_SHOWN = 12;
@@ -89,7 +89,7 @@ export function financesView(ui: Ui): View {
             ['Dette', money(s.debt)],
             ['Valeur de la compagnie', money(value)],
             ['Réputation', `${Math.round(s.reputation)} / 100`],
-            ['Kérosène', `${s.fuelPrice.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} $/kg <small>(${fuelVsNormal >= 0 ? '+' : ''}${Math.round(fuelVsNormal * 100)} % par rapport à la normale)</small>`],
+            ['Kérosène', `${s.fuelPrice.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} $/kg <small>(${fuelVsNormal >= 0 ? '+' : ''}${Math.round(fuelVsNormal * 100)}\u202f% par rapport à la normale)</small>`],
           ])}
         </div>
         ${section(
@@ -105,7 +105,7 @@ export function financesView(ui: Ui): View {
              <dt><b>Recettes</b></dt><dd><b>${money(sum.revenue)}</b></dd>
              ${ledgerRows(shown, OPEX_KEYS, -1)}
              <dt><b>Résultat avant impôt</b></dt><dd><b>${signedMoneyHtml(sum.profitBeforeTax)}</b></dd>
-             <dt>${isCurrent ? 'Impôt estimé (fin de mois)' : 'Impôt sur les sociétés'}</dt><dd>−${money(estTax)}</dd>
+             <dt>${isCurrent ? 'Impôt estimé (fin de mois)' : 'Impôt sur les sociétés'}</dt><dd>${estTax > 0 ? '−' : ''}${money(estTax)}</dd>
              <dt><b>Résultat net</b></dt><dd><b>${signedMoneyHtml(sum.profitBeforeTax - estTax)}</b></dd>
            </dl>
            ${sum.invest > 0 ? `<p class="g-small">Investissements du mois (hors résultat) :</p><dl class="g-kv g-ledger">${ledgerRows(shown, INVEST_KEYS, -1)}</dl>` : ''}`,
@@ -113,7 +113,7 @@ export function financesView(ui: Ui): View {
         ${section(
           'Banque',
           `${kv([
-            ['Taux d’intérêt', `${loanPct.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} % par an`],
+            ['Taux d’intérêt', `${loanPct.toLocaleString('fr-FR', { maximumFractionDigits: 1 })}\u202f% par an`],
             ['Tu peux encore emprunter', money(capacity)],
           ])}
           <div class="g-actions">
@@ -130,8 +130,8 @@ export function financesView(ui: Ui): View {
         ${section(
           'Impôts',
           `${kv([
-            ['Impôt sur les sociétés', `${rate} % du bénéfice, payé en fin de mois`],
-            ['TVA sur les vols intérieurs', `${num(vat)} % du prix des billets`],
+            ['Impôt sur les sociétés', `${num1(rate)}\u202f% du bénéfice, payé en fin de mois`],
+            ['TVA sur les vols intérieurs', `${num(vat)}\u202f% du prix des billets`],
             ['Pertes reportées', `${money(s.taxLossCarry)} <small>(déduites des prochains bénéfices)</small>`],
           ])}`,
         )}

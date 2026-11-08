@@ -38,14 +38,14 @@ export function num1(n: number): string {
 /** 1 234 567 → « 1,2 M », 45 000 → « 45 k ». */
 export function compact(n: number): string {
   const a = Math.abs(n);
-  if (a >= 1e9) return `${nf1.format(n / 1e9)} Md`;
-  if (a >= 1e6) return `${nf1.format(n / 1e6)} M`;
-  if (a >= 1e4) return `${nf0.format(n / 1e3)} k`;
+  if (a >= 1e9) return `${nf1.format(n / 1e9)}\u202fMd`;
+  if (a >= 1e6) return `${nf1.format(n / 1e6)}\u202fM`;
+  if (a >= 1e4) return `${nf0.format(n / 1e3)}\u202fk`;
   return nf0.format(n);
 }
 
 export function pct(ratio: number): string {
-  return `${Math.round(ratio * 100)} %`;
+  return `${Math.round(ratio * 100)}\u202f%`;
 }
 
 export function signedMoneyHtml(v: number): string {

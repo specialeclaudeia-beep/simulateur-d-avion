@@ -222,6 +222,10 @@ export const HUB_START = {
   lineSlots: [0, 2, 3, 4, 5, 6],
   parking: [0, 2, 3, 4, 6, 8],
 };
+/** Choix proposé à la création : le plus grand hub qui laisse au moins 40 % du capital pour les avions. */
+export const FIRST_HUB_BUDGET_SHARE = 0.6;
+/** En dessous de ce reste après l'achat du premier hub, on prévient : pas de quoi acheter un avion. */
+export const FIRST_HUB_MIN_LEFT = 15_000_000;
 /** Acheter un hub hors de son pays coûte plus cher (droits de trafic). */
 export const FOREIGN_HUB_MULT = 1.25;
 /** Revente d'un hub : part de ce qu'il a coûté (achat + améliorations). */

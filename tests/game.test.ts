@@ -9,6 +9,7 @@ import { generateUsedListings, orderQuote } from '../src/game/fleet';
 import { playerFlights, setFlightSource } from '../src/game/flights';
 import { upgradeInfo } from '../src/game/hubs';
 import { summarize } from '../src/game/ledger';
+import { familyMinStars } from '../src/game/pilots';
 import { parseSave, serialize } from '../src/game/save';
 import { advance } from '../src/game/sim';
 import { suggestCode } from '../src/game/newGame';
@@ -243,6 +244,23 @@ describe('règles', () => {
     expect(old.length).toBeGreaterThan(0);
     for (const l of old) expect(T0 - l.builtAt).toBeGreaterThanOrEqual(4 * YEAR - 1);
     for (const l of listings) expect(l.price).toBeGreaterThan(0);
+  });
+
+  it('un pilote qualifié se présente dès le premier avion d’un nouveau type', () => {
+    const ctx = newTestGame('NCE', 'FR', 'facile');
+    const s = ctx.state;
+    // Aucun candidat qualifié A350 (gros-porteur : 2 étoiles minimum) sur le marché.
+    s.market.pilots = s.market.pilots.filter((c) => !c.ratings.includes('A350'));
+    expect(act.orderAircraft(ctx, T0, 'a350-900', 1, 'NCE').ok).toBe(true);
+    const fit = s.market.pilots.filter((c) => c.ratings.includes('A350'));
+    expect(fit).toHaveLength(1);
+    expect(fit[0].stars).toBeGreaterThanOrEqual(familyMinStars(ctx.data.families.get('A350')!));
+    expect(familyMinStars(ctx.data.families.get('A350')!)).toBe(2);
+    // Un deuxième avion du même type n'en ajoute pas d'autre.
+    expect(act.orderAircraft(ctx, T0, 'a350-900', 1, 'NCE').ok).toBe(true);
+    expect(s.market.pilots.filter((c) => c.ratings.includes('A350'))).toHaveLength(1);
+    // Les candidats tirés au hasard ne sont jamais qualifiés sur un avion qu'ils n'auraient pas le droit de piloter.
+    for (const c of s.market.pilots) for (const r of c.ratings) expect(c.stars).toBeGreaterThanOrEqual(familyMinStars(ctx.data.families.get(r)!));
   });
 
   it('forme un pilote et le qualifie', () => {

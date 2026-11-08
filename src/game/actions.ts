@@ -27,7 +27,7 @@ import { orderQuote } from './fleet';
 import { HUB_UPGRADE_LABEL, hubPrice, hubResale, hubValue, newHub, upgradeInfo, type HubUpgrade } from './hubs';
 import { earn, money, spend } from './ledger';
 import { randomName, namePoolFor, randomRegistration } from './names';
-import { baseSalary, pilotName, trainingCost, typeRatingSpec } from './pilots';
+import { baseSalary, ensureQualifiedCandidate, pilotName, trainingCost, typeRatingSpec } from './pilots';
 import { aircraftDailyDepartures, basedAircraft, hubDepartures, programLines } from './schedule';
 import { isPlayerHub, maintenanceQuote, planNext, repairQuote, startMaintenance, startRepair } from './sim';
 import { emptyStats, type Aircraft, type Hub, type Line, type Pilot } from './state';
@@ -166,6 +166,7 @@ export function orderAircraft(ctx: Ctx, t: number, modelId: string, qty: number,
   }
   const mfr = data.manufacturerById.get(model.mfr)!;
   log(ctx, 'money', `Contrat signé avec ${mfr.name} : ${qty} × ${model.name} pour ${money(q.total)}`, undefined, t);
+  offerPilotFor(ctx, t, model.family);
   return ok(`Contrat signé : ${qty} × ${model.name}. Première livraison à ${city(ctx, base)}.`);
 }
 
@@ -191,7 +192,14 @@ export function buyUsed(ctx: Ctx, t: number, listingId: string, base: string): A
     }),
   );
   log(ctx, 'money', `Achat d'occasion : ${data.model(listing.modelId).name} pour ${money(listing.price)}`, undefined, t);
+  offerPilotFor(ctx, t, data.model(listing.modelId).family);
   return ok('Avion acheté : il arrive à son hub d’ici un jour et demi.');
+}
+
+/** Premier avion d'une famille : un pilote qualifié se présente (voir ensureQualifiedCandidate). */
+function offerPilotFor(ctx: Ctx, t: number, family: string): void {
+  const c = ensureQualifiedCandidate(ctx, t, family);
+  if (c) log(ctx, 'good', `${pilotName(c)}, pilote qualifié(e) ${family}, propose ses services : onglet Pilotes, « Recruter ».`, undefined, t);
 }
 
 /** Prix de revente proposé (5 % de frais de courtage, moins s'il est en panne). */

@@ -57,16 +57,19 @@
 .g-nav-company {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 10px 0 8px;
+  gap: 5px;
+  padding: 0 8px 0 6px;
   border-right: 1px solid var(--g-line) !important;
-  min-width: 96px;
+}
+
+.g-nav-logo {
+  display: flex;
 }
 
 .g-nav-cash {
   color: var(--g-fg);
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -82,6 +85,7 @@
   justify-content: center;
   gap: 2px;
   min-width: 0;
+  padding: 0;
   border-top: 3px solid transparent !important;
 }
 
@@ -91,8 +95,11 @@
 }
 
 .g-tab small {
-  font-size: 11px;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 10.5px;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .g-tab.active,
@@ -443,6 +450,11 @@
   gap: 7px 12px;
   margin: 0;
   font-size: 14px;
+}
+
+.g-kv + .g-kv,
+.g-note + .g-kv {
+  margin-top: 8px;
 }
 
 .g-kv dt {
@@ -983,6 +995,13 @@ select.g-input option {
   padding-bottom: 0;
 }
 
+@media (max-width: 899px) {
+  .g-wizard[data-step='1'],
+  .g-wizard[data-step='3'] {
+    height: min(52vh, calc(100dvh - var(--hud-h) - 8px));
+  }
+}
+
 .g-wizard .g-sheet-head {
   flex-direction: column;
   align-items: stretch;
@@ -1338,9 +1357,10 @@ select.g-input option {
  * remontent au-dessus de la barre du bas.
  */
 
+/* Mêmes écarts que sans le jeu (les fiches laissent voir l'attribution de la carte), barre du bas en plus. */
 body.game-on .flight-card,
 body.game-on .country-card {
-  bottom: calc(var(--nav-h) + 12px + env(safe-area-inset-bottom));
+  bottom: calc(var(--nav-h) + 52px + env(safe-area-inset-bottom));
 }
 
 body.game-on .traffic-toggle {
@@ -1412,7 +1432,7 @@ body.wizard-on .country-card {
 
   body.game-on .flight-card,
   body.game-on .country-card {
-    bottom: calc(var(--nav-h) + 24px);
+    bottom: calc(var(--nav-h) + 52px);
   }
 
   body.sheet-open .flight-card,
@@ -1424,5 +1444,10 @@ body.wizard-on .country-card {
   body.sheet-open .maplibregl-ctrl-bottom-right,
   body.wizard-on .maplibregl-ctrl-bottom-right {
     right: 444px;
+  }
+
+  body.sheet-open .g-toasts,
+  body.wizard-on .g-toasts {
+    left: calc((100% - 444px) / 2);
   }
 }

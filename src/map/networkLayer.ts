@@ -154,7 +154,16 @@ export class NetworkLayer {
         source: SRC_PREVIEW,
         filter: ['==', ['geometry-type'], 'Point'],
         paint: {
-          'circle-radius': ['case', ['==', ['get', 'focus'], 1], ['interpolate', ['linear'], ['zoom'], 1, 7, 8, 12], 3],
+          // « zoom » doit rester au premier niveau de l'expression (règle de MapLibre).
+          'circle-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            1,
+            ['case', ['==', ['get', 'focus'], 1], 7, 3],
+            8,
+            ['case', ['==', ['get', 'focus'], 1], 12, 4],
+          ],
           'circle-color': ['case', ['==', ['get', 'focus'], 1], 'rgba(255,209,102,0.25)', PREVIEW_COLOR],
           'circle-stroke-color': PREVIEW_COLOR,
           'circle-stroke-width': ['case', ['==', ['get', 'focus'], 1], 2.5, 0],

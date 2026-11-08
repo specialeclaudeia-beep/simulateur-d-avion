@@ -124,6 +124,8 @@ export async function mountGame(deps: GameDeps): Promise<Game | null> {
     bankruptShown = false;
     ui.close();
     play();
+    const hub = game.state.hubs[0];
+    if (hub) ui.flyTo(hub.iata, 5);
   }
 
   function checkBankruptcy(): void {
@@ -148,7 +150,11 @@ export async function mountGame(deps: GameDeps): Promise<Game | null> {
     play();
     if (summary) showAway(ui, summary);
   } else {
-    startWizard(result.status === 'broken' ? `Ta dernière sauvegarde était illisible (${result.error}). Elle a été mise de côté, pas effacée.` : undefined);
+    startWizard(
+      result.status === 'broken'
+        ? `Ta dernière sauvegarde n’a pas pu être lue (${result.error.replace(/\.$/, '')}). Elle a été mise de côté, pas effacée : tu peux commencer une nouvelle partie.`
+        : undefined,
+    );
   }
 
   // Accès pratique depuis la console du navigateur pour tester.

@@ -113,7 +113,7 @@ export function upgradeInfo(data: GameData, hub: Hub, kind: HubUpgrade): Upgrade
         next: hub.maintenance + 1,
         max: MAINTENANCE_MAX,
         cost,
-        effect: `Révisions et réparations ${pct} % moins chères et plus rapides, moins de pannes`,
+        effect: `Révisions et réparations ${pct}\u202f% moins chères et plus rapides, moins de pannes`,
       };
     }
   }

@@ -1,9 +1,9 @@
 /**
  * Pilotes : candidats au recrutement, salaires, formations.
  */
-import { PILOT_MARKET_SIZE, PILOT_SALARY, PILOT_SIGNING_MONTHS, TRAINING_COST, TYPE_RATING } from './config';
+import { MIN_STARS, PILOT_MARKET_SIZE, PILOT_SALARY, PILOT_SIGNING_MONTHS, PILOT_STAR_HOURS, TRAINING_COST, TYPE_RATING } from './config';
 import type { Ctx } from './context';
-import type { GameData } from './data';
+import type { AircraftModel, GameData } from './data';
 import { starsFromHours } from './economy';
 import { namePoolFor, randomName } from './names';
 import { pick, pickWeighted, randInt, type Rng } from './rng';
@@ -64,8 +64,14 @@ function randomHours(rng: Rng): number {
   return randInt(rng, 12000, 20000);
 }
 
+/** Étoiles qu'il faut pour piloter tous les avions d'une famille (gros-porteurs : 2 ou 3). */
+export function familyMinStars(fam: { models: AircraftModel[] }): number {
+  return fam.models.reduce((m, x) => Math.max(m, MIN_STARS[x.category] ?? 1), 1);
+}
+
+/** Qualification d'un candidat : jamais sur une famille qu'il n'aurait pas le droit de piloter. */
 function randomFamily(ctx: Ctx, stars: number, exclude: string[]): string {
-  const fams = [...ctx.data.families.values()].filter((f) => !exclude.includes(f.name) && (stars >= 2 || !f.large));
+  const fams = [...ctx.data.families.values()].filter((f) => !exclude.includes(f.name) && familyMinStars(f) <= stars);
   return pickWeighted(
     ctx.rng,
     fams.map((f) => f.name),
@@ -73,34 +79,50 @@ function randomFamily(ctx: Ctx, stars: number, exclude: string[]): string {
   );
 }
 
+/** Un candidat au hasard ; `family` impose sa qualification (avec les étoiles qu'il faut pour elle). */
+function newCandidate(ctx: Ctx, t: number, family?: { name: string; models: AircraftModel[] }): PilotCandidate {
+  const { data, rng, state } = ctx;
+  const nationality = rng() < 0.7 ? state.company.country : pick(rng, data.playableCountries()).code;
+  const pool = namePoolFor(nationality, data.country(nationality)?.continent);
+  let hours = randomHours(rng);
+  if (family) hours = Math.max(hours, PILOT_STAR_HOURS[familyMinStars(family)] + randInt(rng, 0, 1_000));
+  const stars = starsFromHours(hours);
+  const ratings = [family ? family.name : randomFamily(ctx, stars, [])];
+  if (stars >= 3 && rng() < 0.4) ratings.push(randomFamily(ctx, stars, ratings));
+  const salary = Math.round((baseSalary(data, state, stars) * (0.92 + rng() * 0.2)) / 100) * 100;
+  return {
+    id: `C${++state.counters.candidate}`,
+    ...randomName(rng, pool),
+    nationality,
+    birthYear: utcYear(t) - Math.round(23 + hours / 700 + rng() * 6),
+    hours,
+    stars,
+    ratings,
+    salary,
+    signingFee: Math.round(salary * PILOT_SIGNING_MONTHS),
+  };
+}
+
 /** Nouvelle liste de pilotes à recruter. */
 export function generateCandidates(ctx: Ctx, t: number, count = PILOT_MARKET_SIZE): PilotCandidate[] {
-  const { data, rng, state } = ctx;
-  const home = state.company.country;
-  const countries = data.playableCountries();
-  const year = utcYear(t);
   const out: PilotCandidate[] = [];
-  for (let i = 0; i < count; i++) {
-    const nationality = rng() < 0.7 ? home : pick(rng, countries).code;
-    const pool = namePoolFor(nationality, data.country(nationality)?.continent);
-    const hours = randomHours(rng);
-    const stars = starsFromHours(hours);
-    const ratings = [randomFamily(ctx, stars, [])];
-    if (stars >= 3 && rng() < 0.4) ratings.push(randomFamily(ctx, stars, ratings));
-    const salary = Math.round((baseSalary(data, state, stars) * (0.92 + rng() * 0.2)) / 100) * 100;
-    out.push({
-      id: `C${++state.counters.candidate}`,
-      ...randomName(rng, pool),
-      nationality,
-      birthYear: year - Math.round(23 + hours / 700 + rng() * 6),
-      hours,
-      stars,
-      ratings,
-      salary,
-      signingFee: Math.round(salary * PILOT_SIGNING_MONTHS),
-    });
-  }
+  for (let i = 0; i < count; i++) out.push(newCandidate(ctx, t));
   return out.sort((a, b) => b.stars - a.stars || a.salary - b.salary);
+}
+
+/**
+ * Un avion d'un type nouveau pour la compagnie vient d'être acheté : si
+ * personne (pilote ou candidat) n'est qualifié dessus, un pilote qualifié
+ * postule aussitôt. On n'attend jamais une semaine pour pouvoir le faire voler.
+ */
+export function ensureQualifiedCandidate(ctx: Ctx, t: number, familyName: string): PilotCandidate | null {
+  const { data, state } = ctx;
+  const family = data.families.get(familyName);
+  const qualified = (ratings: string[]) => ratings.includes(familyName);
+  if (!family || state.pilots.some((p) => qualified(p.ratings)) || state.market.pilots.some((c) => qualified(c.ratings))) return null;
+  const c = newCandidate(ctx, t, family);
+  state.market.pilots.unshift(c);
+  return c;
 }
 
 export function pilotName(p: Pick<Pilot, 'firstName' | 'lastName'>): string {

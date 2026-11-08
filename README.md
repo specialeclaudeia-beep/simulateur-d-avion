@@ -11,6 +11,7 @@ npm install
 npm run dev        # serveur de développement (accessible aussi depuis le téléphone sur le même Wi-Fi)
 npm run build      # version finale dans dist/
 npm run preview    # tester la version finale
+npm test           # tests du moteur de jeu (vitest)
 ```
 
 `npm run dev` affiche une adresse « Network » (par ex. `http://192.168.1.20:5173`) :
@@ -51,6 +52,35 @@ ouvre-la dans Chrome sur Android pour jouer sur le téléphone.
 - **Vols du joueur** : `aircraft.addProvider(fn)` ajoute une source de vols au format `Flight`
   (`src/flights/types.ts`) ; ils sont toujours affichés, un peu plus gros, avec un contour blanc.
 
+## Le jeu : gérer sa compagnie
+
+- **Créer sa compagnie** (4 étapes) : nom, code à 2 lettres (numéros de vol), couleur et logo
+  (symbole et forme, ou image importée) ; pays du siège (vrais taux d'impôt, TVA, aéroports,
+  trafic, niveau de vie), dans la liste ou en touchant le globe ; capital de départ (facile,
+  normal, difficile) ; premier hub parmi les vrais aéroports du pays, classés par trafic et payés
+  selon leur taille.
+- **Hubs** : guide des premiers pas, améliorations (portes, licences de lignes, parking, qualité du
+  terminal, atelier de maintenance), achat d'autres hubs dans le monde (25 % plus cher hors de
+  son pays), revente.
+- **Lignes** : ouverture d'une vraie ligne depuis un hub (demande et concurrents réels), prix du
+  billet réglable, fermeture.
+- **Avions** : contrats avec les vrais constructeurs (remise selon la quantité, délais de
+  livraison), marché de l'occasion renouvelé chaque semaine, pannes, réparations, révisions,
+  changement de base, revente.
+- **Pilotes** : recrutement (étoiles, salaire, qualifications par famille d'avions), formation,
+  licenciement. Un pilote qualifié se présente dès qu'un nouveau type d'avion arrive dans la flotte.
+  On met un pilote dans un avion et on lui donne ses lignes : les vols suivent des horaires
+  réalistes (de 5 h 30 à 23 h, heure locale).
+- **Économie** : billets selon la distance et le niveau de vie, kérosène qui varie, taxes
+  d'aéroport, équipages, maintenance, assurance, intérêts, impôt sur les sociétés du pays (pertes
+  reportées), TVA sur les vols intérieurs, emprunts, faillite si la trésorerie reste négative.
+- **Carte** : le réseau du joueur à sa couleur (lignes pleines si un avion y vole, pointillées
+  sinon) ; ses avions volent au milieu du trafic réel ; toucher un hub, une ligne ou un avion ouvre
+  sa fiche.
+- **Sauvegarde** : automatique dans le navigateur (`localStorage`, avec numéro de version et
+  migration), export / import d'un fichier ; une sauvegarde illisible est mise de côté, jamais
+  effacée. Le temps peut continuer quand le jeu est fermé (jusqu'à 7 jours).
+
 ## Organisation du code
 
 | Dossier | Rôle |
@@ -60,12 +90,20 @@ ouvre-la dans Chrome sur Android pour jouer sur le téléphone.
 | `src/flights/` | Vols : format commun (`types.ts`), trafic réel (`realTraffic.ts`), calculs de grand cercle (`geo.ts`), chargement des données (`data.ts`) |
 | `src/map/aircraft.ts` | Calque des avions : animation, toucher, trajectoire, caméra qui suit ; silhouettes dans `aircraftIcons.ts` |
 | `src/map/layerSlots.ts` | Emplacements où les futurs calques s'insèrent (lignes aériennes, aéroports, avions) |
-| `src/ui/` | Interface par-dessus la carte (barre du temps, fiche pays) |
+| `src/map/networkLayer.ts` | Réseau du joueur sur la carte (hubs, destinations, lignes) et aperçus pendant les choix |
+| `src/game/` | Moteur du jeu, sans affichage : état et sauvegarde (`state.ts`, `save.ts`), simulation (`sim.ts`), actions du joueur (`actions.ts`), économie, flotte, hubs, pilotes, réglages chiffrés (`config.ts`) |
+| `src/ui/` | Interface par-dessus la carte (barre du temps, fiche pays, fiche vol) |
+| `src/ui/game/` | Interface du jeu : création de compagnie (`wizard.ts`), barre d'onglets et panneau (`ui.ts`), écrans (`views/`), styles (`game.css`) |
+| `tests/` | Tests du moteur (`npm test`) ; `calibration.test.ts` (avec `CALIB=1 npm test`) affiche des comptes simulés pour régler l'équilibre économique |
 | `public/geo/` | Données géographiques servies telles quelles (contours des pays, lumières des villes) |
 | `data/` | Données réelles du jeu (aéroports, trafic, lignes, avions), préparées à part |
 
 Règle simple : tout ce qui dépend du temps lit `clock.now()` (jamais `Date.now()`), pour
 que l'accélération du temps s'applique partout.
+
+Le moteur (`src/game/`) ne touche jamais au DOM : l'interface appelle ses actions
+(`game.run(action, …)`), qui renvoient un message d'erreur en français ou modifient la partie.
+Les vols du joueur sont donnés au calque des avions par `playerFlights()` (`src/game/flights.ts`).
 
 ## Sources et licences
 

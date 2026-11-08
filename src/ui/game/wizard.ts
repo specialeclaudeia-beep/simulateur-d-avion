@@ -6,13 +6,14 @@
  *   4. premier hub parmi les vrais aéroports du pays, classés par trafic.
  */
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { DIFFICULTIES, DOMESTIC_VAT_MAX, DOMESTIC_VAT_SHARE, HUB_START, type Difficulty } from '../../game/config';
+import { DIFFICULTIES, DOMESTIC_VAT_MAX, DOMESTIC_VAT_SHARE, FIRST_HUB_BUDGET_SHARE, FIRST_HUB_MIN_LEFT, HUB_START, type Difficulty } from '../../game/config';
 import { TIER_LABEL, type Airport, type Country, type GameData } from '../../game/data';
 import { suggestCode, type NewGameParams } from '../../game/newGame';
 import type { Logo, LogoShape } from '../../game/state';
 import type { Countries } from '../../map/countries';
+import { globeZoom } from '../../map/createMap';
 import type { NetworkLayer } from '../../map/networkLayer';
-import { compact, esc, flagEmoji, fold, kv, money, note, num } from './dom';
+import { compact, esc, flagEmoji, fold, kv, money, note, num, num1 } from './dom';
 import { LOGO_SHAPES, LOGO_SYMBOLS, PALETTE, imageToLogo, logoHtml } from './logo';
 import { mapPadding } from './ui';
 
@@ -81,6 +82,8 @@ export function runWizard(deps: WizardDeps): void {
   // ── Rendu des étapes ──
 
   function render(): void {
+    // Aux étapes Pays et Premier hub, le panneau est plus bas pour laisser voir le globe.
+    root.dataset.step = String(st.step);
     stepsEl.innerHTML = STEPS.map((s, i) => `<li class="${i === st.step ? 'on' : i < st.step ? 'done' : ''}" title="${s}"><span>${i + 1}</span><small>${s}</small></li>`).join('');
     body.innerHTML = [renderCompany, renderCountry, renderCapital, renderHub][st.step]();
     body.scrollTop = 0;
@@ -154,7 +157,7 @@ export function runWizard(deps: WizardDeps): void {
     return `<button type="button" class="g-row${c.code === st.country ? ' on' : ''}" data-w="country" data-v="${c.code}">
       <span class="g-row-icon g-flag">${flagEmoji(c.code)}</span>
       <span class="g-row-main"><span class="g-row-title">${esc(c.name)}</span>
-        <span class="g-row-sub">${num(data.airportsOfCountry(c.code).length)} aéroports · impôt ${tax ?? '?'} %</span></span>
+        <span class="g-row-sub">${num(data.airportsOfCountry(c.code).length)} aéroports · impôt ${tax === null ? '?' : num1(tax)}\u202f%</span></span>
       <span class="g-row-right">${compact(c.pax)} pass./an</span>
     </button>`;
   }
@@ -174,13 +177,13 @@ export function runWizard(deps: WizardDeps): void {
         <div class="g-card g-selected">
           <h3 class="g-h3"><span class="g-flag">${flagEmoji(sel.code)}</span> ${esc(sel.name)}</h3>
           ${kv([
-            ['Impôt sur les sociétés', `${data.corporateTax(sel.code)} % du bénéfice`],
-            ['TVA sur les vols intérieurs', `${num(domestic)} %`],
+            ['Impôt sur les sociétés', `${num1(data.corporateTax(sel.code))}\u202f% du bénéfice`],
+            ['TVA sur les vols intérieurs', `${num(domestic)}\u202f%`],
             ['Aéroports avec des lignes', `${num(airports.length)} (dont ${big} grands hubs)`],
             ['Trafic du pays', `${compact(sel.pax)} passagers par an`],
             ['Prix des billets et salaires', `× ${coef.toFixed(2).replace('.', ',')} <small>(niveau de vie)</small>`],
           ])}
-          <p class="g-small">Tes hubs dans ce pays coûtent le prix normal ; ailleurs, 25 % de plus.</p>
+          <p class="g-small">Tes hubs dans ce pays coûtent le prix normal ; ailleurs, 25\u202f% de plus.</p>
         </div>`;
     }
     return `
@@ -230,12 +233,15 @@ export function runWizard(deps: WizardDeps): void {
         <div class="g-card g-selected">
           <h3 class="g-h3">${esc(a.name)} <small>${a.iata}</small></h3>
           ${kv([
+            ['Prix', `<b>${money(a.price)}</b>`],
+            ['Il te restera', a.price <= capital ? money(capital - a.price) : `<span class="neg">il manque ${money(a.price - capital)}</span>`],
+          ])}
+          ${a.price <= capital && capital - a.price < FIRST_HUB_MIN_LEFT ? note('Il ne te resterait presque rien pour acheter un avion : choisis plutôt un hub moins cher.', 'warn') : ''}
+          ${kv([
             ['Taille', `${TIER_LABEL[a.tier]} · n° ${a.rank} mondial`],
             ['Passagers par an', num(a.pax)],
             ['Destinations réelles', num(routes)],
             ['Pour commencer', `${Math.min(HUB_START.gates[a.tier], Math.max(1, a.gates))} porte(s), ${Math.min(HUB_START.lineSlots[a.tier], routes)} licences de lignes, ${HUB_START.parking[a.tier]} places de parking`],
-            ['Prix', `<b>${money(a.price)}</b>`],
-            ['Il te restera', a.price <= capital ? money(capital - a.price) : `<span class="neg">il manque ${money(a.price - capital)}</span>`],
           ])}
         </div>`;
     }
@@ -261,6 +267,14 @@ export function runWizard(deps: WizardDeps): void {
       if (top) map.flyTo({ center: [top.lon, top.lat], zoom: 3.6, padding: mapPadding(), duration: 1500 });
     }
     render();
+  }
+
+  /** Cadre le globe entier dans la partie de l'écran que le panneau laisse visible. */
+  function showGlobe(): void {
+    const pad = mapPadding(0);
+    const visible = Math.min(window.innerWidth - pad.left - pad.right, window.innerHeight - pad.top - pad.bottom);
+    const minSide = Math.min(window.innerWidth, window.innerHeight);
+    map.easeTo({ zoom: Math.max(0.6, globeZoom() + Math.log2(visible / minSide)), padding: pad, duration: 900 });
   }
 
   function selectHub(iata: string): void {
@@ -406,10 +420,12 @@ export function runWizard(deps: WizardDeps): void {
     if (st.step < 3) {
       st.step++;
       render();
+      if (st.step === 1 && !st.country) showGlobe();
       if (st.step === 3 && !st.hub) {
-        // Propose d'emblée le plus grand hub abordable.
+        // Propose d'emblée le plus grand hub qui laisse de quoi acheter des avions.
         const capital = DIFFICULTIES[st.difficulty].capital;
-        const best = data.airportsOfCountry(st.country!).find((a) => a.price <= capital);
+        const airports = data.airportsOfCountry(st.country!);
+        const best = airports.find((a) => a.price <= capital * FIRST_HUB_BUDGET_SHARE) ?? airports.find((a) => a.price <= capital);
         if (best) selectHub(best.iata);
       }
       return;

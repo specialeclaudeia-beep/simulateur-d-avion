@@ -77,7 +77,7 @@ export function fleetView(ui: Ui): View {
             icon: modelIcon(m),
             title: `${esc(aircraftName(ac))} <small>${esc(m.name)}</small>`,
             sub: `${badge(st.label, st.tone)} ${st.detail}`,
-            right: `${bar(ac.condition / 100)}<small>${Math.round(ac.condition)} %</small>`,
+            right: `${bar(ac.condition / 100)}<small>${Math.round(ac.condition)}\u202f%</small>`,
           });
         })
         .join('');
@@ -149,7 +149,7 @@ export function aircraftView(ui: Ui, id: string): View {
         <div class="g-card">
           <p class="g-title-line">${modelIcon(m)} <b>${esc(mfr?.name ?? '')} ${esc(m.name)}</b> · ${capacity(m)}</p>
           <p>${badge(st.label, st.tone)} ${st.detail}</p>
-          <p class="g-cond">État ${bar(ac.condition / 100)} <b>${Math.round(ac.condition)} %</b></p>
+          <p class="g-cond">État ${bar(ac.condition / 100)} <b>${Math.round(ac.condition)}\u202f%</b></p>
           <div class="g-actions">${main.join('')}</div>
         </div>
         ${section('Pilote', pilotBlock)}
@@ -383,14 +383,17 @@ export function buyNewView(ui: Ui): View {
             id: mf.id,
             icon: `<span class="g-flag">${flagEmoji(mf.country)}</span>`,
             title: esc(mf.name),
-            sub: `${models.length} modèle(s) · remise ${Math.round(lo * 100)} à ${Math.round(hi * 100)} % selon la quantité${bought ? ` · ${bought} déjà acheté(s)` : ''}`,
+            sub: `${models.length} modèle(s) · remise ${Math.round(lo * 100)} à ${Math.round(hi * 100)}\u202f% selon la quantité${bought ? ` · ${bought} déjà acheté(s)` : ''}`,
           });
         })
         .join('');
-      return `<p class="g-small">Un contrat se négocie : plus tu commandes d’avions d’un coup, plus la remise sur le prix catalogue est grande. Les clients fidèles gagnent un petit bonus.</p><div class="g-list">${rows}</div>`;
+      return `<p class="g-small">Un contrat se négocie : plus tu commandes d’avions d’un coup, plus la remise sur le prix catalogue est grande. Les clients fidèles gagnent un petit bonus.</p>
+        ${btn('♻️ Moins cher : les avions d’occasion', 'used', { cls: 'ghost' })}
+        <div class="g-list">${rows}</div>`;
     },
     action(a, el) {
       if (a === 'mfr') ui.push(manufacturerView(ui, el.dataset.id!));
+      else if (a === 'used') ui.push(usedMarketView(ui));
     },
   };
 }
@@ -525,7 +528,7 @@ export function usedMarketView(ui: Ui): View {
           return `<div class="g-card g-listing">
             <p class="g-title-line">${modelIcon(m)} <b>${esc(d.manufacturerById.get(m.mfr)?.name ?? '')} ${esc(m.name)}</b> · ${capacity(m)}</p>
             <p class="g-small">${age.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} ans · ${num(l.hours)} h de vol · ${num(m.rangeKm)} km de rayon d’action</p>
-            <p class="g-cond">État ${bar(l.condition / 100)} <b>${l.condition} %</b></p>
+            <p class="g-cond">État ${bar(l.condition / 100)} <b>${l.condition}\u202f%</b></p>
             <div class="g-listing-foot"><b class="g-price">${money(l.price)}</b>${btn('Acheter', 'buy', { id: l.id, disabled: l.price > s.cash })}</div>
           </div>`;
         })
@@ -549,7 +552,7 @@ export function usedMarketView(ui: Ui): View {
       if (!l) return;
       const m = ui.game.data.model(l.modelId);
       void ui
-        .confirm({ title: 'Acheter cet avion ?', text: `${esc(m.name)} d’occasion (état ${l.condition} %) pour <b>${money(l.price)}</b>, livré à ${esc(cityOf(ui.game.data, base))}.`, ok: 'Acheter' })
+        .confirm({ title: 'Acheter cet avion ?', text: `${esc(m.name)} d’occasion (état ${l.condition}\u202f%) pour <b>${money(l.price)}</b>, livré à ${esc(cityOf(ui.game.data, base))}.`, ok: 'Acheter' })
         .then((yes) => {
           if (yes && ui.act(act.buyUsed, l.id, base)) ui.openTab('fleet');
         });
