@@ -11,6 +11,11 @@ import { mountTrafficToggle } from './ui/trafficToggle';
 import { NetworkLayer } from './map/networkLayer';
 import { mountGame } from './ui/game';
 import { setupPwa } from './pwa';
+import { music } from './audio/music';
+import { mountSoundToggle } from './ui/soundToggle';
+import { mountFlightSounds } from './audio/flightSounds';
+import { setupAudioEngine } from './audio/engine';
+import { mountUiSounds } from './audio/uiSounds';
 
 async function start(): Promise<void> {
   const clock = new GameClock();
@@ -33,15 +38,22 @@ async function start(): Promise<void> {
   mountCountryCard(document.body, countries);
   mountFlightCard(document.body, aircraft, clock);
   mountTrafficToggle(document.body, aircraft);
+  mountSoundToggle(document.body);
+  mountFlightSounds(aircraft, clock);
+  mountUiSounds(map, aircraft);
 
   // Accès pratique depuis la console du navigateur pour tester.
-  Object.assign(window, { map, clock, countries, aircraft });
+  Object.assign(window, { map, clock, countries, aircraft, music });
 
   await mountGame({ map, clock, countries, aircraft, network, onTimeJump: () => dayNight.refresh() });
 }
 
 // Appli installable et jeu hors connexion, prêts avant même la carte.
 setupPwa();
+// Musique de fond : démarre au premier toucher de l'écran.
+music.setup();
+// Bruitages (avions et interface) : prêts au premier toucher, eux aussi.
+setupAudioEngine();
 
 start().catch((err: unknown) => {
   console.error(err);
