@@ -5,6 +5,12 @@ import { Countries } from './map/countries';
 import { DayNight } from './map/dayNight';
 import { mountCountryCard } from './ui/countryCard';
 import { mountHud } from './ui/hud';
+import { AircraftLayer } from './map/aircraft';
+import { mountFlightCard } from './ui/flightCard';
+import { mountTrafficToggle } from './ui/trafficToggle';
+import { NetworkLayer } from './map/networkLayer';
+import { mountGame } from './ui/game';
+import { setupPwa } from './pwa';
 
 async function start(): Promise<void> {
   const clock = new GameClock();
@@ -13,15 +19,29 @@ async function start(): Promise<void> {
   const dayNight = new DayNight(map, clock);
   await dayNight.install();
 
+  // Les avions s'installent avant les pays : toucher un avion ne sélectionne pas le pays dessous.
+  const aircraft = new AircraftLayer(map, clock);
+  // Le réseau du joueur aussi : toucher un de ses hubs ou une de ses lignes ouvre sa fiche.
+  const network = new NetworkLayer(map);
+
   const countries = new Countries(map);
   await countries.install();
+  aircraft.onSelect((f) => f && countries.clearSelection());
+  countries.onSelect((c) => c && aircraft.clearSelection());
 
   mountHud(document.getElementById('hud')!, clock, map, () => dayNight.refresh());
   mountCountryCard(document.body, countries);
+  mountFlightCard(document.body, aircraft, clock);
+  mountTrafficToggle(document.body, aircraft);
 
   // Accès pratique depuis la console du navigateur pour tester.
-  Object.assign(window, { map, clock, countries });
+  Object.assign(window, { map, clock, countries, aircraft });
+
+  await mountGame({ map, clock, countries, aircraft, network, onTimeJump: () => dayNight.refresh() });
 }
+
+// Appli installable et jeu hors connexion, prêts avant même la carte.
+setupPwa();
 
 start().catch((err: unknown) => {
   console.error(err);

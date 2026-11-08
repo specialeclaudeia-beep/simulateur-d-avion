@@ -82,6 +82,7 @@ export class Countries {
   }
 
   private onClick = (e: MapMouseEvent): void => {
+    if (e.defaultPrevented) return; // un avion a été touché
     const f = this.map.queryRenderedFeatures(e.point, { layers: ['countries-hit'] })[0];
     if (!f || f.id === undefined) {
       this.clearSelection();

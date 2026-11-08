@@ -5,5 +5,8 @@
   {"id": "atr", "name": "ATR", "country": "FR", "hq": "Blagnac (Toulouse)", "founded": 1981, "wikidata": "Q459083", "website": "https://www.atr-aircraft.com", "contractDiscount": [0.2, 0.35], "deliveryMonths": [12, 30]},
   {"id": "dhc", "name": "De Havilland Canada", "country": "CA", "hq": "Calgary", "founded": 1928, "wikidata": "Q285246", "website": "https://dehavilland.com", "contractDiscount": [0.2, 0.35], "deliveryMonths": [12, 36]},
   {"id": "comac", "name": "COMAC", "country": "CN", "hq": "Shanghai", "founded": 2008, "wikidata": "Q176788", "website": "http://www.comac.cc", "contractDiscount": [0.3, 0.5], "deliveryMonths": [18, 48]},
-  {"id": "uac", "name": "UAC (Yakovlev)", "country": "RU", "hq": "Moscou", "founded": 2006, "wikidata": "Q1136226", "website": "https://www.uacrussia.ru", "contractDiscount": [0.3, 0.5], "deliveryMonths": [18, 48]}
+  {"id": "uac", "name": "UAC (Yakovlev)", "country": "RU", "hq": "Moscou", "founded": 2006, "wikidata": "Q1136226", "website": "https://www.uacrussia.ru", "contractDiscount": [0.3, 0.5], "deliveryMonths": [18, 48]},
+  {"id": "bombardier", "name": "Bombardier (CRJ)", "country": "CA", "hq": "Montréal", "founded": 1942, "wikidata": null, "website": "https://bombardier.com", "contractDiscount": null, "deliveryMonths": null, "usedOnly": true},
+  {"id": "saab", "name": "Saab", "country": "SE", "hq": "Linköping", "founded": 1937, "wikidata": null, "website": "https://www.saab.com", "contractDiscount": null, "deliveryMonths": null, "usedOnly": true},
+  {"id": "beechcraft", "name": "Beechcraft", "country": "US", "hq": "Wichita", "founded": 1932, "wikidata": null, "website": "https://beechcraft.txtav.com", "contractDiscount": null, "deliveryMonths": null, "usedOnly": true}
 ]
