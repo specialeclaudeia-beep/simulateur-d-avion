@@ -5,7 +5,7 @@
  * cela depuis trois endroits au choix (bouton 🎧 de la fiche) :
  *
  * - dehors : moteurs, vent, pluie, l'aéroport au sol (passerelle, tracteur,
- *   bagages, carburant…), et les bruits de l'avion (train, volets, aérofreins) ;
+ *   bus, escalier, bagages, carburant, traiteur, cales…), et les bruits de l'avion (train, volets, aérofreins) ;
  * - en cabine : moteurs étouffés, passagers, portes, annonces, service à bord ;
  * - au poste de pilotage : interrupteurs, radio, balises, pilote automatique
  *   et, de temps en temps, une alarme (trafic proche, cisaillement de vent…).
@@ -44,10 +44,10 @@ export function nextListenPoint(): void {
 // ── Les sons, rangés par endroit ──
 
 const CABIN = new Set(
-  'air_nozzle_click beverage_pour blanket_rustle boarding_chime cabin_ambience_busy cabin_ambience cabin_door_close cabin_door_open cabin_turbulence_rattle call_button_chime curtain_slide galley_cart_brake galley_cart_roll galley_oven_beep galley_steam ice_cubes interphone_pickup lavatory_flush lavatory_lock meal_foil overhead_bin_close overhead_bin_open pa_chime seat_recline seatbelt_buckle seatbelt_sign_ding window_shade reading_light_click oxygen_mask_drop rain_on_fuselage'.split(' '),
+  'air_nozzle_click beverage_pour blanket_rustle boarding_chime cabin_ambience_busy cabin_ambience cabin_door_close cabin_door_open cabin_turbulence_rattle call_button_chime curtain_slide galley_cart_brake galley_cart_roll galley_oven_beep galley_steam ice_cubes interphone_pickup lavatory_flush lavatory_lock meal_foil overhead_bin_close overhead_bin_open pa_chime seat_recline seatbelt_buckle seatbelt_sign_ding window_shade reading_light_click oxygen_mask_drop rain_on_fuselage cabin_clean_vacuum decompression evac_slide'.split(' '),
 );
 const COCKPIT = new Set(
-  'altitude_alert_horn autopilot_disconnect autothrottle_disconnect fire_bell gear_warning hydraulic_low_chime master_caution master_warning overspeed_warning stall_warning tcas_resolution tcas_traffic terrain_whoop wind_shear_alert button_press circuit_breaker cockpit_ambience fuel_pump_switch guard_open knob_detent marker_inner marker_middle marker_outer nav_ident_cdg oxygen_test_hiss rudder_pedal switch_off switch_on trim_wheel windshield_wiper yoke_movement radio_morse_ident radio_squelch radio_static_burst'.split(' '),
+  'altitude_alert_horn autopilot_disconnect autothrottle_disconnect fire_bell gear_warning hydraulic_low_chime master_caution master_warning overspeed_warning stall_warning tcas_resolution tcas_traffic terrain_whoop wind_shear_alert button_press circuit_breaker cockpit_ambience fuel_pump_switch guard_open knob_detent marker_inner marker_middle marker_outer nav_ident_cdg oxygen_test_hiss rudder_pedal switch_off switch_on trim_wheel windshield_wiper yoke_movement radio_morse_ident radio_squelch radio_static_burst radio_comms_loop windshield_crack fire_discharge'.split(' '),
 );
 
 /** Volume de chaque endroit selon où l'on écoute ; dehors passe par un filtre en cabine et au cockpit. */
@@ -80,23 +80,23 @@ const LOW: Stage[] = ['parked', 'starting', 'takeoff', 'approach', 'final', 'lan
 
 const LOOPS: Record<Stage, Record<string, number>> = {
   parked: { apron_ambience: 0.4, gpu_hum: 0.25, cabin_ambience_busy: 0.5, cockpit_ambience: 0.25 },
-  starting: { engine_idle: 0.35, apron_ambience: 0.3, cabin_ambience_busy: 0.4, cockpit_ambience: 0.35 },
-  takeoff: { engine_full_power: 0.4, cabin_ambience: 0.3, cockpit_ambience: 0.4 },
+  starting: { engine_idle: 0.35, apron_ambience: 0.3, cabin_ambience_busy: 0.4, cockpit_ambience: 0.35, radio_comms_loop: 0.3 },
+  takeoff: { engine_full_power: 0.4, cabin_ambience: 0.3, cockpit_ambience: 0.4, radio_comms_loop: 0.25 },
   climb: { engine_full_power: 0.3, wind_external: 0.25, cabin_ambience: 0.35, cockpit_ambience: 0.4 },
   cruise: { engine_cruise: 0.35, wind_external: 0.35, cabin_ambience: 0.4, cockpit_ambience: 0.4 },
   descent: { engine_idle: 0.3, wind_external: 0.4, cabin_ambience: 0.4, cockpit_ambience: 0.4 },
-  approach: { engine_idle: 0.3, wind_external: 0.3, cabin_ambience: 0.35, cockpit_ambience: 0.4 },
-  final: { engine_idle: 0.35, wind_external: 0.25, cabin_ambience: 0.3, cockpit_ambience: 0.4 },
-  landed: { engine_taxi: 0.35, cabin_ambience_busy: 0.45, cockpit_ambience: 0.35 },
+  approach: { engine_idle: 0.3, wind_external: 0.3, cabin_ambience: 0.35, cockpit_ambience: 0.4, radio_comms_loop: 0.25 },
+  final: { engine_idle: 0.35, wind_external: 0.25, cabin_ambience: 0.3, cockpit_ambience: 0.4, radio_comms_loop: 0.2 },
+  landed: { engine_taxi: 0.35, cabin_ambience_busy: 0.45, cockpit_ambience: 0.35, radio_comms_loop: 0.25 },
 };
 
 const ENTER: Partial<Record<Stage, Cue[]>> = {
   starting: [
-    ['jet_bridge_disconnect', 0, 0.9], ['cabin_door_close', 0.5, 0.9], ['seatbelt_sign_ding', 2, 0.8],
-    ['pushback_tug', 3, 0.8], ['tug_horn', 9, 0.7], ['engine_start', 4, 0.8],
+    ['cabin_door_close', 0.5, 0.9], ['seatbelt_sign_ding', 2, 0.8], ['towbar_connect', 1, 0.9], ['chock_remove', 2.2, 0.9],
+    ['pushback_tug', 3, 0.8], ['engine_start', 4, 0.8], ['towbar_disconnect', 10, 0.9], ['tug_horn', 11, 0.7],
     ['switch_on', 0, 0.8], ['fuel_pump_switch', 1.5, 0.8], ['button_press', 3.5, 0.8], ['pa_chime', 6, 0.7],
   ],
-  takeoff: [['engine_spool_up', 0, 0.8], ['runway_roll', 0.5, 0.7], ['knob_detent', 0, 0.8], ['rudder_pedal', 2, 0.8], ['yoke_movement', 4, 0.8]],
+  takeoff: [['engine_spool_up', 0, 0.8], ['knob_detent', 0, 0.8], ['rudder_pedal', 2, 0.8], ['yoke_movement', 4, 0.8]],
   climb: [['gear_retract', 0, 1], ['flaps_retract', 2.5, 1], ['trim_wheel', 1, 0.8], ['switch_off', 4, 0.8], ['call_button_chime', 4, 0.6]],
   cruise: [['seatbelt_sign_ding', 0, 0.8], ['pa_chime', 2, 0.7], ['knob_detent', 0, 0.8]],
   descent: [['airbrake_deploy', 0, 1], ['altitude_alert_horn', 0.5, 0.6], ['interphone_pickup', 1, 0.8], ['pa_chime', 2, 0.7]],
@@ -112,7 +112,9 @@ const ENTER: Partial<Record<Stage, Cue[]>> = {
 const RANDOM: Partial<Record<Stage, Cue[][]>> = {
   parked: [
     [['belt_loader', 0, 0.6]], [['luggage_thud', 0, 0.8], ['luggage_thud', 1.6, 0.7]], [['cargo_door', 0, 0.8]],
-    [['refuel_pump', 0, 0.6]], [['distant_chime', 0, 0.6]], [['tug_horn', 0, 0.5]],
+    [['fuel_nozzle_connect', 0, 0.9], ['refuel_pump', 1.2, 0.6]], [['catering_truck_lift', 0, 0.8], ['catering_trolley_load', 4, 0.8]],
+    [['water_service', 0, 0.8]], [['lav_service', 0, 0.8]], [['cone_place', 0, 0.9]], [['gpu_connect', 0, 0.8]], [['pca_hose_connect', 0, 0.8]],
+    [['air_start_cart', 0, 0.5]], [['cabin_clean_vacuum', 0, 0.6]], [['bird_chirp', 0, 0.6]], [['bird_flock', 0, 0.5]], [['distant_chime', 0, 0.6]], [['tug_horn', 0, 0.5]],
     [['overhead_bin_open', 0, 0.8], ['overhead_bin_close', 2.5, 0.9]], [['seatbelt_buckle', 0, 1]], [['reading_light_click', 0, 0.8]],
     [['window_shade', 0, 0.8]], [['air_nozzle_click', 0, 0.8]], [['call_button_chime', 0, 0.5]],
     [['oxygen_test_hiss', 0, 0.7]], [['switch_on', 0, 0.8], ['button_press', 0.6, 0.8]], [['circuit_breaker', 0, 0.8]], [['radio_squelch', 0, 0.8]],
@@ -168,8 +170,8 @@ const WEATHER_RANDOM: Record<Weather, Cue[][]> = {
   beau: [],
   pluie: [[['windshield_wiper', 0, 0.7], ['windshield_wiper', 1.7, 0.7]]],
   averse: [[['windshield_wiper', 0, 0.7], ['windshield_wiper', 1.7, 0.7], ['windshield_wiper', 3.4, 0.7]]],
-  orage: [[['thunder_distant', 0, 0.7]], [['thunder_close', 0, 0.6]], [['windshield_wiper', 0, 0.7], ['windshield_wiper', 1.7, 0.7]]],
-  neige: [[['ice_crackle', 0, 0.8]]],
+  orage: [[['thunder_distant', 0, 0.7]], [['thunder_close', 0, 0.6]], [['hail_fuselage', 0, 0.6]], [['windshield_wiper', 0, 0.7], ['windshield_wiper', 1.7, 0.7]]],
+  neige: [[['ice_crackle', 0, 0.8]], [['snow_plow', 0, 0.5]], [['footsteps_snow', 0, 0.6]]],
   brouillard: [[['fog_horn', 0, 0.5]]],
 };
 
@@ -178,9 +180,15 @@ const INCIDENTS: Cue[][] = [
   [['tcas_traffic', 0, 0.8], ['tcas_resolution', 3, 0.8]],
   [['master_caution', 0, 0.8], ['hydraulic_low_chime', 2, 0.8], ['guard_open', 5, 0.8], ['button_press', 5.6, 0.8]],
   [['overspeed_warning', 0, 1], ['trim_wheel', 3.5, 0.8], ['autopilot_disconnect', 4, 0.6]],
-  [['master_warning', 0, 0.7], ['fire_bell', 1.5, 0.5], ['guard_open', 4, 0.8], ['switch_off', 4.5, 0.8], ['circuit_breaker', 6, 0.8]],
-  [['master_warning', 0, 0.6], ['oxygen_mask_drop', 1, 0.9], ['interphone_pickup', 4, 0.8], ['pa_chime', 5, 0.7]],
+  [['master_warning', 0, 0.6], ['decompression', 0, 0.7], ['oxygen_mask_drop', 1, 0.9], ['interphone_pickup', 4, 0.8], ['pa_chime', 5, 0.7]],
+  [['bird_strike', 0, 0.9], ['master_caution', 0.8, 0.8], ['yoke_movement', 1.5, 0.8]],
+
 ];
+/** Feu moteur éteint en vol : le seul incident qui se termine par une évacuation au sol. */
+const FIRE: Cue[] = [['master_warning', 0, 0.7], ['fire_bell', 1.5, 0.5], ['guard_open', 4, 0.8], ['fire_discharge', 4.6, 0.8], ['switch_off', 6, 0.8], ['circuit_breaker', 7, 0.8]];
+/** Grêle sous l'orage : le pare-brise se fissure. */
+const HAIL: Cue[] = [['hail_fuselage', 0, 0.7], ['windshield_crack', 2, 0.8], ['master_caution', 3, 0.8]];
+
 /** Alarme pendant l'approche, pour quelques vols. */
 const APPROACH_ALERTS: Cue[][] = [
   [['terrain_whoop', 0, 0.6], ['yoke_movement', 1, 0.8]],
@@ -235,9 +243,13 @@ export function mountFlightSounds(layer: AircraftLayer, clock: GameClock): void 
   let stage: Stage | null = null;
   let stageSince = 0;
   let weather: Weather = 'beau';
+  /** Avion garé loin du terminal : escalier et bus au lieu de la passerelle. */
+  let remote = false;
   let doorDone = false;
   let shutdownDone = false;
   let incidentAt = 0;
+  /** Le vol a eu un feu moteur : évacuation par les toboggans à l'arrivée. */
+  let hadFire = false;
   let nextRandom = 0;
   let nextWeather = 0;
 
@@ -258,7 +270,10 @@ export function mountFlightSounds(layer: AircraftLayer, clock: GameClock): void 
     if (stage === 'landed' && shutdownDone) {
       delete out.engine_taxi;
       out.apron_ambience = 0.4;
+      out.radio_comms_loop = 0;
     }
+    const groundNow = stage === 'parked' || (stage === 'landed' && doorDone);
+    if (groundNow && remote) out.apron_bus_loop = 0.3;
     if (LOW.includes(stage) || stage === 'climb' || stage === 'descent') {
       const k = LOW.includes(stage) ? 1 : 0.5; // plus haut, la pluie s'éloigne
       for (const [n, v] of Object.entries(WEATHER_LOOPS[weather])) out[n] = v * k;
@@ -278,7 +293,14 @@ export function mountFlightSounds(layer: AircraftLayer, clock: GameClock): void 
     nextRandom = real + 6 + Math.random() * 6;
     if (withCues) {
       for (const cue of ENTER[next] ?? []) play(cue);
-      if (next === 'starting' && weather === 'neige') play(['deicing_spray', 0, 0.8]);
+      const wet = weather === 'pluie' || weather === 'averse' || weather === 'orage';
+      if (next === 'starting') play(remote ? ['mobile_stairs', 0, 0.8] : ['jet_bridge_disconnect', 0, 0.9]);
+      if (next === 'starting' && weather === 'neige') {
+        play(['deicing_boom', 0, 0.7]);
+        play(['deicing_spray', 3, 0.8]);
+      }
+      if (next === 'takeoff') play([wet ? 'wet_runway_roll' : 'runway_roll', 0.5, 0.7]);
+      if (next === 'landed' && wet) play(['wet_runway_roll', 0.3, 0.6]);
       if (next === 'approach' && flight?.to === 'CDG') play(['nav_ident_cdg', 2, 0.5]);
       else if (next === 'approach') play(['radio_morse_ident', 2, 0.4]);
       if (next === 'approach' && weather === 'orage' && roll(flight!.id, 3) < 0.5) play(['wind_shear_alert', 4, 0.7]);
@@ -307,6 +329,8 @@ export function mountFlightSounds(layer: AircraftLayer, clock: GameClock): void 
       // Nouvel avion : on entre directement dans son étape, sans bruits de transition.
       flight = f;
       weather = weatherOf(f, airportLat(next === 'parked' || next === 'starting' ? f.from : f.to), t);
+      remote = roll(f.id, 5) < 0.3;
+      hadFire = false;
       incidentAt = roll(f.id, 2) < 0.12 ? real + 25 + Math.random() * 40 : 0;
       enter(next, real, false);
       if (next === 'parked') play(['apu_start', 0, 0.6]);
@@ -318,8 +342,14 @@ export function mountFlightSounds(layer: AircraftLayer, clock: GameClock): void 
     if (stage === 'landed') {
       if (!doorDone && real - stageSince > DOOR_OPEN_AFTER_S) {
         doorDone = true;
-        play(['jet_bridge_connect', 0, 0.9]);
-        play(['cabin_door_open', 1.5, 0.9]);
+        play(['chock_place', 0, 0.9]);
+        if (hadFire) play(['evac_slide', 2, 0.9]);
+        if (remote) {
+          play(['mobile_stairs', 1, 0.8]);
+          play(['apron_bus_door', 7, 0.8]);
+        } else play(['jet_bridge_connect', 1, 0.9]);
+        play(['cabin_door_open', 3, 0.9]);
+        loops.set(wantedLoops());
       }
       if (!shutdownDone && real - stageSince > SHUTDOWN_AFTER_S) {
         shutdownDone = true;
@@ -328,12 +358,20 @@ export function mountFlightSounds(layer: AircraftLayer, clock: GameClock): void 
         play(['fuel_pump_switch', 2, 0.8]);
         play(['apu_shutdown', 6, 0.6]);
         play(['belt_loader', 5, 0.6]);
+        play(['gpu_connect', 3, 0.8]);
+        play(['pca_hose_connect', 8, 0.8]);
+        play(['cone_place', 4, 0.9]);
         loops.set(wantedLoops());
       }
     }
     if (stage === 'cruise' && incidentAt && real > incidentAt) {
       incidentAt = 0;
-      playGroup(INCIDENTS);
+      const r = roll(flight!.id, 6);
+      if (weather === 'orage' && r < 0.4) for (const cue of HAIL) play(cue);
+      else if (r < 0.1) {
+        hadFire = true;
+        for (const cue of FIRE) play(cue);
+      } else playGroup(INCIDENTS);
     }
     if (real > nextRandom) {
       playGroup(RANDOM[stage!]);

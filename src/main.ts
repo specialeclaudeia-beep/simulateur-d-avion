@@ -40,6 +40,7 @@ async function start(): Promise<void> {
   mountTrafficToggle(document.body, aircraft);
   mountSoundToggle(document.body);
   mountFlightSounds(aircraft, clock);
+  mountUiSounds(map, aircraft);
 
   // Accès pratique depuis la console du navigateur pour tester.
   Object.assign(window, { map, clock, countries, aircraft, music });
@@ -53,7 +54,6 @@ setupPwa();
 music.setup();
 // Bruitages (avions et interface) : prêts au premier toucher, eux aussi.
 setupAudioEngine();
-mountUiSounds();
 
 start().catch((err: unknown) => {
   console.error(err);
