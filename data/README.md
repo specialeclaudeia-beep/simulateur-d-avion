@@ -11,8 +11,9 @@ se modifient dans `scripts/data/curated/`.
 | `routes.json` | 30 205 lignes régulières actuelles (paires d'aéroports) | ~1 Mo |
 | `airlines.json` | 603 compagnies qui opèrent ces lignes | ~100 Ko |
 | `countries.json` | 249 pays et territoires : fiscalité, population, PIB, nombre de hubs | ~50 Ko |
-| `manufacturers.json` | 7 constructeurs réels (Airbus, Boeing, Embraer, ATR, De Havilland Canada, COMAC, UAC) | 2 Ko |
-| `aircraft.json` | 40 modèles d'avions (passagers et cargo) | 13 Ko |
+| `manufacturers.json` | 10 constructeurs réels (Airbus, Boeing, Embraer, ATR, De Havilland Canada, COMAC, UAC, plus Bombardier, Saab et Beechcraft pour l'occasion) | 3 Ko |
+| `aircraft.json` | 71 modèles d'avions (passagers et cargo), neufs et d'occasion | 22 Ko |
+| `traffic.json` | trafic réel quotidien : ~100 000 vols par jour avec numéro de vol, modèle d'avion, couleur et flotte de chaque compagnie | ~4,6 Mo (1 Mo compressé) |
 | `meta.json` | date de génération, compteurs, formules utilisées | 1 Ko |
 
 Conseil côté jeu : charger `countries`, `manufacturers`, `aircraft` et `meta` au démarrage, puis
@@ -22,9 +23,11 @@ environ 5 fois moins).
 ## Régénérer les données
 
 ```bash
-pip install pandas lxml          # seulement pour lire les tableaux Wikipédia
-python3 scripts/data/fetch.py    # télécharge les sources dans scripts/data/.cache/ (non versionné)
-python3 scripts/data/build.py    # écrit data/*.json
+pip install pandas lxml                  # seulement pour lire les tableaux Wikipédia
+python3 scripts/data/fetch.py            # télécharge les sources dans scripts/data/.cache/ (non versionné)
+python3 scripts/data/build.py            # écrit data/*.json
+python3 scripts/data/fetch_traffic.py    # vols et immatriculations réels (~20 Mo, quelques minutes)
+python3 scripts/data/build_traffic.py    # écrit data/traffic.json (et recopie les fiches avions)
 ```
 
 `fetch.py --force` retélécharge tout. Les lignes aériennes sont mises à jour chaque semaine à
@@ -123,6 +126,46 @@ souvent 40 à 60 % de moins que le catalogue) et `deliveryMonths` (délai de liv
   constructeur (Airbus 2018, Boeing 2019, leurs dernières grilles publiques), `estimation`
   sinon (Embraer, ATR, De Havilland, COMAC, UAC et modèles récents ne publient pas de prix).
 - `eis` : année de mise en service ; `inProduction: false` = plus fabriqué neuf (occasion seulement).
+  Pour ces modèles, `priceSource` vaut `occasion` et `priceUsd` est la valeur approximative d'un
+  exemplaire en milieu de vie. Ce sont les avions les plus nombreux dans le ciel aujourd'hui
+  (737-800 : ~4 500 en service, A320ceo : ~3 600 selon l'IATA), d'où leur présence.
+- Les constructeurs `usedOnly: true` (Bombardier, Saab, Beechcraft) ne vendent plus d'avions neufs :
+  pas de contrat possible, seulement le marché de l'occasion.
+
+### `traffic.json` — le trafic réel qui vole sur la carte
+
+```json
+{"flightsPerDay":99894,"airlines":{"AF":{"color":"#002157","cargo":false,
+  "fleet":{"a220-300":57,"a350-900":29},
+  "flights":[["384","ABJ","CDG","a350-900",93],["1234","CDG","NCE","a220-300"],...]}}}
+```
+
+- `color` : couleur principale de la livrée (`scripts/data/curated/airline_colors.json`, ~200
+  compagnies) ou couleur stable calculée depuis le code pour les autres.
+- `fleet` : avions de la compagnie repérés dans la base d'immatriculations, par modèle du jeu.
+  C'est un échantillon (la base ne couvre pas tous les pays), pas la flotte complète.
+- `flights` : un vol régulier par ligne `[numéro, départ, arrivée, modèle, jours]`. Le vol a lieu
+  chaque jour, sauf si `jours` est présent : masque de 7 bits (lundi = bit 0, dimanche = bit 6).
+- L'heure de départ n'est pas dans le fichier : le jeu la tire de façon stable à partir du numéro
+  (surtout en journée, heure locale ; vagues du matin et du soir), et calcule la durée avec la
+  distance et la vitesse de croisière du modèle (`src/flights/realTraffic.ts`).
+
+Comment il est construit (`scripts/data/build_traffic.py`) :
+
+1. **Vrais numéros de vol** : base Standing Data de Virtual Radar Server (alimentée par les
+   récepteurs ADS-B des passionnés), qui associe chaque indicatif radio (ex. `AFR1234`) aux aéroports
+   desservis. On ne garde que les vols qui correspondent à une ligne actuelle de `routes.json`.
+2. **Vraies flottes** : immatriculations de la même base (type OACI + compagnie), traduites en
+   modèles du jeu ; à défaut, les équipements par ligne d'OpenFlights (2014) remis à jour avec la
+   même catégorie d'avion.
+3. **Fréquences** : la base cumule les numéros de plusieurs saisons, elle ne dit donc pas combien
+   de vols ont lieu chaque jour. La fréquence d'une ligne vient d'un modèle de gravité (trafic des
+   deux aéroports, distance, long-courriers moins fréquents), partagée entre les compagnies selon
+   leurs numéros connus et leur base, puis recalée pour que le total mondial fasse ~100 000 vols par
+   jour (IATA : ~38 millions de vols par an). Les long-courriers font ~8 % des vols, comme en réalité.
+4. **Modèle par vol** : dans la flotte de la compagnie, un avion qui a l'autonomie et la piste
+   nécessaires, de préférence de la bonne taille pour la distance.
+
 
 ## Règles de calcul
 
@@ -151,14 +194,18 @@ puis Wikidata (dernière année ≥ 2023, sinon 2019 pour éviter les années Co
 | [Wikipédia](https://en.wikipedia.org/wiki/List_of_busiest_airports_by_passenger_traffic) | classements de trafic ACI et régionaux, fiscalité par pays | CC BY-SA |
 | [Banque mondiale](https://data.worldbank.org) | population, PIB par habitant | CC BY 4.0 |
 | Wikimedia Commons | logos des compagnies et constructeurs | marques déposées de leurs propriétaires |
+| [Standing Data (Virtual Radar Server)](https://github.com/vradarserver/standing-data) | numéros de vol réels par ligne, immatriculations et types des avions de chaque compagnie | CC0 |
+| [IATA, *The global commercial aircraft fleet*](https://www.iata.org/en/iata-repository/publications/economic-reports/the-global-commercial-aircraft-fleet/) | choix des modèles en service à ajouter, part des long-courriers | — |
 | Fiches constructeurs (Airbus, Boeing, Embraer, ATR, De Havilland, COMAC, UAC) | caractéristiques et prix catalogue des avions, saisis à la main | — |
 
 Le jeu n'est pas publié : les logos réels sont utilisés pour un usage personnel uniquement.
 
 ## Limites connues
 
-- Les lignes ne disent pas combien de vols par jour ni quels avions : le jeu devra estimer la
-  demande, par exemple à partir du trafic des deux aéroports et de la distance.
+- `routes.json` ne dit pas combien de vols par jour ni quels avions ; `traffic.json` les estime
+  (voir plus haut). Les fréquences sont donc plausibles mais pas exactes (ex. Ryanair y fait ~6 000
+  vols par jour contre ~3 300 en réalité, car il a énormément de petites lignes).
+- Les horaires sont inventés (stables d'un jour à l'autre), pas les vrais horaires des compagnies.
 - Certains noms d'aéroports de la source des lignes sont anciens (ex. `KTI` est le nouvel
   aéroport Techo de Phnom Penh mais garde le nom de Kratie).
 - Les caractéristiques des avions (consommation, piste, prix estimés) sont arrondies ; elles
