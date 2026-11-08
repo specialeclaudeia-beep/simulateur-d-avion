@@ -353,18 +353,34 @@ export class Ui {
     ).then((r) => r === '1');
   }
 
-  /** Demande un texte (ex. renommer un avion) ; null si annulé. */
-  prompt(opts: { title: string; value: string; placeholder?: string; maxLength?: number }): Promise<string | null> {
+  /**
+   * Demande un texte (ex. renommer un avion, coller le code d'une partie) ; null si annulé.
+   * `multiline` : grande zone de texte, sans limite de longueur.
+   */
+  prompt(opts: {
+    title: string;
+    value: string;
+    placeholder?: string;
+    maxLength?: number;
+    multiline?: boolean;
+    text?: string;
+    ok?: string;
+  }): Promise<string | null> {
     let value = opts.value;
+    const placeholder = `placeholder="${esc(opts.placeholder ?? '')}"`;
+    const field = opts.multiline
+      ? `<textarea class="g-input g-paste" rows="5" ${placeholder}>${esc(opts.value)}</textarea>`
+      : `<input class="g-input" type="text" value="${esc(opts.value)}" ${placeholder} maxlength="${opts.maxLength ?? 30}">`;
     return modal(
       `<h2>${esc(opts.title)}</h2>
-       <input class="g-input" type="text" value="${esc(opts.value)}" placeholder="${esc(opts.placeholder ?? '')}" maxlength="${opts.maxLength ?? 30}">
+       ${opts.text ? `<p>${opts.text}</p>` : ''}
+       ${field}
        <div class="g-modal-actions">
          <button type="button" class="g-btn ghost" data-r="0">Annuler</button>
-         <button type="button" class="g-btn" data-r="1">Valider</button>
+         <button type="button" class="g-btn" data-r="1">${esc(opts.ok ?? 'Valider')}</button>
        </div>`,
       (box) => {
-        const input = box.querySelector<HTMLInputElement>('input')!;
+        const input = box.querySelector<HTMLInputElement | HTMLTextAreaElement>('input, textarea')!;
         input.addEventListener('input', () => (value = input.value));
         input.focus();
         input.select();

@@ -31,10 +31,10 @@ export function parseSave(text: string): ParseResult {
   try {
     raw = JSON.parse(text);
   } catch {
-    return { ok: false, error: 'Ce fichier n’est pas une sauvegarde lisible.' };
+    return { ok: false, error: 'Ce n’est pas une sauvegarde lisible (fichier ou code incomplet ?).' };
   }
   if (!raw || typeof raw !== 'object' || (raw as SaveFile).format !== FORMAT) {
-    return { ok: false, error: 'Ce fichier n’est pas une sauvegarde du simulateur.' };
+    return { ok: false, error: 'Ce n’est pas une sauvegarde du simulateur.' };
   }
   const file = raw as SaveFile;
   if (typeof file.version !== 'number' || file.version > SAVE_VERSION) {
