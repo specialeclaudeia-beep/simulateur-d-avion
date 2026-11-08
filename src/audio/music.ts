@@ -15,12 +15,14 @@
 export interface Track {
   file: string;
   title: string;
+  /** Correction de volume : les trois morceaux sonnent aussi fort (mesuré à −18 LUFS). */
+  gain: number;
 }
 
 export const TRACKS: Track[] = [
-  { file: 'clairiere-mecanique.mp3', title: 'Clairière mécanique' },
-  { file: 'horizon-usine.mp3', title: 'Horizon usine' },
-  { file: 'trajectoire-du-noyau.mp3', title: 'Trajectoire du noyau' },
+  { file: 'clairiere-mecanique.mp3', title: 'Clairière mécanique', gain: 0.7 },
+  { file: 'horizon-usine.mp3', title: 'Horizon usine', gain: 1 },
+  { file: 'trajectoire-du-noyau.mp3', title: 'Trajectoire du noyau', gain: 0.85 },
 ];
 
 const STORAGE_KEY = 'simulateur-compagnie:son';
@@ -29,6 +31,8 @@ const DEFAULT_VOLUME = 0.5;
 const DEFAULT_FX = 0.7;
 /** Fondu à la reprise et à la coupure (ms). */
 const FADE_MS = 600;
+/** Pendant qu'on écoute un avion, la musique baisse pour laisser entendre les bruitages. */
+const DUCK = 0.35;
 
 interface SoundSettings {
   /** Tout le son (musique et bruitages). */
@@ -67,6 +71,7 @@ class Music {
   private objectUrl: string | null = null;
   private unlocked = false;
   private fadeTimer = 0;
+  private ducked = false;
   private readonly listeners = new Set<() => void>();
 
   constructor() {
@@ -90,6 +95,18 @@ class Music {
       if (document.hidden) this.audio.pause();
       else void this.resume();
     });
+  }
+
+  /** Volume réel du lecteur : réglage × correction du morceau × baisse éventuelle. */
+  private get level(): number {
+    return this.settings.volume * TRACKS[this.index].gain * (this.ducked ? DUCK : 1);
+  }
+
+  /** Baisse la musique (un avion est écouté) ou la remet. */
+  duck(on: boolean): void {
+    if (on === this.ducked) return;
+    this.ducked = on;
+    if (this.playing) this.fadeTo(this.level);
   }
 
   get on(): boolean {
@@ -125,7 +142,7 @@ class Music {
     this.save();
     if (this.playing) {
       window.clearInterval(this.fadeTimer);
-      this.audio.volume = this.settings.volume;
+      this.audio.volume = this.level;
     }
   }
 
@@ -176,7 +193,7 @@ class Music {
       if (!this.settings.on || document.hidden) return;
       this.audio.volume = 0;
       await this.audio.play();
-      this.fadeTo(this.settings.volume);
+      this.fadeTo(this.level);
     } catch (err) {
       console.warn('Musique indisponible :', err);
     }

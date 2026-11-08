@@ -17,6 +17,7 @@ import type { GameClock } from '../core/clock';
 import type { Flight } from '../flights/types';
 import type { AircraftLayer } from '../map/aircraft';
 import { LoopSet, audio, onAudioReady, playSound } from './engine';
+import { music } from './music';
 
 // ── Où l'on écoute ──
 
@@ -78,16 +79,17 @@ function stageOf(f: Flight, t: number, phase: string | undefined): Stage {
 /** Étapes proches du sol (on y entend la pluie et l'aéroport). */
 const LOW: Stage[] = ['parked', 'starting', 'takeoff', 'approach', 'final', 'landed'];
 
+/** Sons en boucle (tous à la même force dans les fichiers : ces volumes font le mélange). */
 const LOOPS: Record<Stage, Record<string, number>> = {
-  parked: { apron_ambience: 0.4, gpu_hum: 0.25, cabin_ambience_busy: 0.5, cockpit_ambience: 0.25 },
-  starting: { engine_idle: 0.35, apron_ambience: 0.3, cabin_ambience_busy: 0.4, cockpit_ambience: 0.35, radio_comms_loop: 0.3 },
-  takeoff: { engine_full_power: 0.4, cabin_ambience: 0.3, cockpit_ambience: 0.4, radio_comms_loop: 0.25 },
-  climb: { engine_full_power: 0.3, wind_external: 0.25, cabin_ambience: 0.35, cockpit_ambience: 0.4 },
-  cruise: { engine_cruise: 0.35, wind_external: 0.35, cabin_ambience: 0.4, cockpit_ambience: 0.4 },
-  descent: { engine_idle: 0.3, wind_external: 0.4, cabin_ambience: 0.4, cockpit_ambience: 0.4 },
-  approach: { engine_idle: 0.3, wind_external: 0.3, cabin_ambience: 0.35, cockpit_ambience: 0.4, radio_comms_loop: 0.25 },
-  final: { engine_idle: 0.35, wind_external: 0.25, cabin_ambience: 0.3, cockpit_ambience: 0.4, radio_comms_loop: 0.2 },
-  landed: { engine_taxi: 0.35, cabin_ambience_busy: 0.45, cockpit_ambience: 0.35, radio_comms_loop: 0.25 },
+  parked: { apron_ambience: 0.6, gpu_hum: 0.35, cabin_ambience_busy: 0.6, cockpit_ambience: 0.6 },
+  starting: { engine_idle: 0.8, apron_ambience: 0.6, cabin_ambience_busy: 0.6, cockpit_ambience: 0.6, radio_comms_loop: 0.4 },
+  takeoff: { engine_full_power: 0.9, cabin_ambience: 0.6, cockpit_ambience: 0.6, radio_comms_loop: 0.4 },
+  climb: { engine_full_power: 0.9, wind_external: 0.45, cabin_ambience: 0.6, cockpit_ambience: 0.6 },
+  cruise: { engine_cruise: 0.85, wind_external: 0.45, cabin_ambience: 0.6, cockpit_ambience: 0.6 },
+  descent: { engine_idle: 0.8, wind_external: 0.45, cabin_ambience: 0.6, cockpit_ambience: 0.6 },
+  approach: { engine_idle: 0.8, wind_external: 0.45, cabin_ambience: 0.6, cockpit_ambience: 0.6, radio_comms_loop: 0.4 },
+  final: { engine_idle: 0.8, wind_external: 0.45, cabin_ambience: 0.6, cockpit_ambience: 0.6, radio_comms_loop: 0.4 },
+  landed: { engine_taxi: 0.8, cabin_ambience_busy: 0.6, cockpit_ambience: 0.6, radio_comms_loop: 0.4 },
 };
 
 const ENTER: Partial<Record<Stage, Cue[]>> = {
@@ -159,10 +161,10 @@ function weatherOf(f: Flight, lat: number, t: number): Weather {
 
 const WEATHER_LOOPS: Record<Weather, Record<string, number>> = {
   beau: {},
-  pluie: { rain_light: 0.5, rain_on_fuselage: 0.3 },
-  averse: { rain_heavy: 0.45, rain_on_fuselage: 0.5 },
-  orage: { storm_ambience: 0.45, rain_heavy: 0.3, rain_on_fuselage: 0.5, wind_strong: 0.3 },
-  neige: { snow_wind: 0.45, wind_strong: 0.2 },
+  pluie: { rain_light: 0.5, rain_on_fuselage: 0.6 },
+  averse: { rain_heavy: 0.7, rain_on_fuselage: 0.6 },
+  orage: { storm_ambience: 0.7, rain_heavy: 0.7, rain_on_fuselage: 0.6, wind_strong: 0.5 },
+  neige: { snow_wind: 0.6, wind_strong: 0.5 },
   brouillard: {},
 };
 
@@ -269,11 +271,11 @@ export function mountFlightSounds(layer: AircraftLayer, clock: GameClock): void 
     const out = { ...LOOPS[stage] };
     if (stage === 'landed' && shutdownDone) {
       delete out.engine_taxi;
-      out.apron_ambience = 0.4;
+      out.apron_ambience = 0.6;
       out.radio_comms_loop = 0;
     }
     const groundNow = stage === 'parked' || (stage === 'landed' && doorDone);
-    if (groundNow && remote) out.apron_bus_loop = 0.3;
+    if (groundNow && remote) out.apron_bus_loop = 0.4;
     if (LOW.includes(stage) || stage === 'climb' || stage === 'descent') {
       const k = LOW.includes(stage) ? 1 : 0.5; // plus haut, la pluie s'éloigne
       for (const [n, v] of Object.entries(WEATHER_LOOPS[weather])) out[n] = v * k;
@@ -281,7 +283,7 @@ export function mountFlightSounds(layer: AircraftLayer, clock: GameClock): void 
     const ground = stage === 'parked' || (stage === 'landed' && shutdownDone);
     const at = stage === 'parked' ? flight.from : flight.to;
     const h = localHour(at, clock.now());
-    if (ground && h >= 5 && h < 8 && weather === 'beau') out.birds_dawn = 0.4;
+    if (ground && h >= 5 && h < 8 && weather === 'beau') out.birds_dawn = 0.5;
     return out;
   };
 
@@ -316,6 +318,7 @@ export function mountFlightSounds(layer: AircraftLayer, clock: GameClock): void 
     let f = layer.selectedFlight();
     // L'avion posé n'est plus sélectionné (sa fiche se ferme) : on écoute quand même la fin.
     if (!f && flight && stage && t >= flight.arrMs && !shutdownDone) f = flight;
+    music.duck(!!f);
     if (!f) {
       if (flight) {
         loops.set({});

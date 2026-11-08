@@ -31,7 +31,7 @@ const COFFEE: Cue[] = [['coffee_grinder', 0, 0.5], ['coffee_pour', 3, 0.6], ['cu
 
 const SCENES: Record<string, Scene> = {
   terminal: {
-    loops: { terminal_ambience: 0.5, escalator_loop: 0.12, walkway_loop: 0.12 },
+    loops: { terminal_ambience: 0.8, escalator_loop: 0.25, walkway_loop: 0.25 },
     random: [
       [['barcode_scan', 0, 0.4], ['boarding_pass_tear', 0.6, 0.6]], [['boarding_pass_print', 0, 0.6]], [['security_beep', 0, 0.3]],
       [['security_tray', 0, 0.6]], [['passport_stamp', 0, 0.7]], [['checkin_bell', 0, 0.5]], [['distant_chime', 0, 0.6]],
@@ -40,14 +40,14 @@ const SCENES: Record<string, Scene> = {
     ],
   },
   hangar: {
-    loops: { apron_ambience: 0.35 },
+    loops: { apron_ambience: 0.6 },
     random: [
       [['gpu_connect', 0, 0.7]], [['towbar_connect', 0, 0.8]], [['chock_place', 0, 0.8]], [['air_start_cart', 0, 0.4]],
       [['hydraulic_pump', 0, 0.5]], [['cargo_door', 0, 0.6]], [['tug_horn', 0, 0.4]],
     ],
   },
   office: {
-    loops: { office_ambience: 0.45 },
+    loops: { office_ambience: 0.7 },
     random: [
       [['keyboard_typing', 0, 0.6]], [['dot_matrix_print', 0, 0.5]], [['fax_telex', 0, 0.5]], [['photocopier', 0, 0.5]],
       [['phone_ring', 0, 0.4], ['phone_pickup', 3, 0.6], ['phone_hangup', 9, 0.6]], COFFEE,
