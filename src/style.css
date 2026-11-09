@@ -57,61 +57,175 @@ body {
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 6px 10px;
-  padding: 6px 10px;
-  border-radius: 14px;
-  background: var(--hud-bg);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  gap: 8px 12px;
+  padding: 8px 10px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(20, 30, 60, 0.86), rgba(8, 14, 32, 0.86));
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
   max-width: 100%;
 }
 
+/* ── Heure ── */
+
 .hud-time {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.hud-date {
+.hud-clock {
+  display: inline-flex;
+  align-items: baseline;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.hud-sec {
+  font-size: 15px;
+  font-weight: 600;
   color: var(--hud-muted);
+  margin-left: 1px;
+}
+
+.hud-bar.paused .hud-clock {
+  color: #ffc04d;
+  animation: hud-blink 1.6s ease-in-out infinite;
+}
+
+@keyframes hud-blink {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.hud-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.15;
+}
+
+.hud-date,
+.hud-date-short {
   font-size: 13px;
+  font-weight: 600;
+  color: var(--hud-fg);
   text-transform: capitalize;
 }
 
-.hud-clock {
-  font-size: 18px;
-  font-weight: 600;
+.hud-date-short {
+  display: none;
 }
 
 .hud-utc {
   color: var(--hud-muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 
+/* ── Vitesses : commande segmentée avec pastille qui glisse ── */
+
 .hud-speeds {
+  position: relative;
   display: flex;
-  gap: 3px;
+  padding: 3px;
+  border-radius: 13px;
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
 }
+
+.hud-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  width: 0;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #6bb6ff, #2f86e8);
+  box-shadow: 0 2px 10px rgba(77, 163, 255, 0.45);
+  transition:
+    transform 0.25s cubic-bezier(0.3, 1.3, 0.5, 1),
+    width 0.25s ease,
+    background 0.2s;
+}
+
+.hud-bar.paused .hud-thumb {
+  background: linear-gradient(180deg, #ffcf6b, #f39c12);
+  box-shadow: 0 2px 10px rgba(243, 156, 18, 0.5);
+}
+
+.hud-bar.fast .hud-thumb {
+  background: linear-gradient(180deg, #b48cff, #7b4dff);
+  box-shadow: 0 2px 12px rgba(123, 77, 255, 0.55);
+}
+
+.hud-speed {
+  position: relative;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 42px;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--hud-muted);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.hud-speed:hover {
+  color: var(--hud-fg);
+}
+
+.hud-speed.active {
+  color: #04122a;
+}
+
+.hud-pause {
+  color: #ffc04d;
+}
+
+.hud-tools {
+  display: flex;
+  gap: 6px;
+}
+
+/* ── Boutons ronds partagés (cartes, fiche vol, outils) ── */
 
 .hud-btn {
   appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.07);
   color: var(--hud-fg);
   font: inherit;
   font-size: 13px;
+  font-weight: 600;
   min-width: 38px;
-  min-height: 34px; /* cible tactile confortable */
-  padding: 4px 8px;
-  border-radius: 9px;
+  min-height: 36px; /* cible tactile confortable */
+  padding: 4px 10px;
+  border-radius: 11px;
   cursor: pointer;
+  transition: background 0.15s;
 }
 
 .hud-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .hud-btn.active {
@@ -121,14 +235,34 @@ body {
   font-weight: 700;
 }
 
+.hud-now {
+  color: #ffc04d;
+  border-color: rgba(255, 192, 77, 0.45);
+}
+
 @media (max-width: 520px) {
+  .hud-bar {
+    width: 100%;
+    gap: 8px;
+    padding: 8px;
+  }
+  .hud-time {
+    flex: 1;
+  }
   .hud-date {
     display: none;
   }
-  .hud-btn {
-    min-width: 34px;
-    padding: 4px 6px;
-    font-size: 12px;
+  .hud-date-short {
+    display: inline;
+  }
+  .hud-speeds {
+    order: 3;
+    width: 100%;
+  }
+  .hud-speed {
+    flex: 1;
+    min-width: 0;
+    padding: 0 4px;
   }
 }
 

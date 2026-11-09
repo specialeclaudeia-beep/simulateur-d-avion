@@ -112,6 +112,18 @@ export function row(opts: { action: string; id?: string; icon?: string; title: s
   </button>`;
 }
 
+/**
+ * Portrait d'une personne : pastille ronde à ses initiales, d'une couleur qui
+ * lui est propre (tirée de son nom), avec le drapeau de son pays en badge.
+ */
+export function avatar(p: { firstName: string; lastName: string; nationality?: string }, size: 'm' | 'l' = 'm'): string {
+  let h = 0;
+  const key = `${p.firstName} ${p.lastName}`;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  const initials = `${p.firstName.charAt(0)}${p.lastName.replace(/^(de |van |da |le |el |al-)/i, '').charAt(0)}`.toUpperCase();
+  return `<span class="g-avatar ${size}" style="--h:${h % 360}" aria-hidden="true"><b>${esc(initials)}</b>${p.nationality ? `<i>${flagEmoji(p.nationality)}</i>` : ''}</span>`;
+}
+
 /** Paire « libellé : valeur » dans une grille. */
 export function kv(pairs: [string, string][]): string {
   return `<dl class="g-kv">${pairs.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`;

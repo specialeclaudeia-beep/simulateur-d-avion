@@ -7,7 +7,7 @@ import { PILOT_SEVERANCE_MONTHS, PILOT_SIGNING_MONTHS, TRAINING_DAYS } from '../
 import { pilotProblem } from '../../../game/economy';
 import { familyMinStars, trainingCost, typeRatingSpec } from '../../../game/pilots';
 import type { Pilot } from '../../../game/state';
-import { badge, btn, dateLong, empty, esc, flagEmoji, kv, money, note, num, num1, row, section, stars, when } from '../dom';
+import { avatar, badge, btn, dateLong, empty, esc, kv, money, note, num, num1, row, section, stars, when } from '../dom';
 import type { Ui, View } from '../ui';
 import { aircraftName, pilotFullName } from './common';
 import { aircraftView } from './fleet';
@@ -53,7 +53,7 @@ export function pilotsView(ui: Ui): View {
           row({
             action: 'pilot',
             id: p.id,
-            icon: `<span class="g-flag">${flagEmoji(p.nationality)}</span>`,
+            icon: avatar(p),
             title: `${esc(pilotFullName(p))} ${stars(p.stars)}`,
             sub: `${pilotStatus(ui, p)} ${p.ratings.length ? `· ${esc(p.ratings.join(', '))}` : ''}`,
             right: `${money(p.salary)}<small>/mois</small>`,
@@ -89,7 +89,7 @@ function pilotView(ui: Ui, id: string): View {
       const age = new Date(ui.now).getUTCFullYear() - p.birthYear;
       return `
         <div class="g-card">
-          <p class="g-title-line"><span class="g-flag">${flagEmoji(p.nationality)}</span> <b>${esc(pilotFullName(p))}</b> ${stars(p.stars)}</p>
+          <p class="g-title-line g-person">${avatar(p, 'l')} <span><b>${esc(pilotFullName(p))}</b> ${stars(p.stars)}</span></p>
           <p>${pilotStatus(ui, p)}</p>
           ${kv([
             ['Âge', `${age} ans`],
@@ -230,7 +230,7 @@ export function hireView(ui: Ui): View {
         .map((c) => {
           const fits = useful(c);
           return `<div class="g-card g-listing${fits ? ' good' : ''}">
-            <p class="g-title-line"><span class="g-flag">${flagEmoji(c.nationality)}</span> <b>${esc(pilotFullName(c))}</b> ${stars(c.stars)}</p>
+            <p class="g-title-line g-person">${avatar(c)} <span><b>${esc(pilotFullName(c))}</b> ${stars(c.stars)}</span></p>
             <p class="g-small">${num(c.hours)} h de vol · qualifié(e) ${esc(c.ratings.join(', '))}${fits ? ` · ${badge('vole sur ta flotte', 'ok')}` : ''}</p>
             <div class="g-listing-foot"><span>${money(c.salary)}<small>/mois</small></span>${btn(`Embaucher · ${money(c.signingFee)}`, 'hire', { id: c.id, cls: 'small', disabled: c.signingFee > s.cash })}</div>
           </div>`;

@@ -5,7 +5,7 @@
  */
 import { FUEL_PRICE_MAX, FUEL_PRICE_MIN, FUEL_PRICE_START, HISTORY_MONTHS } from './config';
 import { log, type Ctx } from './context';
-import { emptyStats, type GameState, type LedgerKey, type MonthLedger } from './state';
+import { emptyStats, type DaySnap, type GameState, type LedgerKey, type MonthLedger } from './state';
 import { monthKey } from './time';
 
 export const LEDGER_LABEL: Record<LedgerKey, string> = {
@@ -91,6 +91,64 @@ export function summarize(l: MonthLedger): MonthSummary {
   return { revenue, opex, tax, profitBeforeTax, profit: profitBeforeTax - tax, invest: sum(INVEST_KEYS) };
 }
 
+/** Relevé de fin de journée (t = début du jour suivant) dans le mois en cours. */
+export function snapDay(s: GameState, t: number): void {
+  const end = t - 1;
+  if (monthKey(end) !== s.ledger.month) return;
+  const sum = summarize(s.ledger);
+  const snap: DaySnap = {
+    d: new Date(end).getUTCDate(),
+    revenue: sum.revenue,
+    opex: sum.opex + sum.tax,
+    flights: s.ledger.flights,
+    pax: s.ledger.pax,
+    cargoT: s.ledger.cargoT,
+    cash: s.cash,
+  };
+  const days = (s.ledger.days ??= []);
+  if (days.length && days[days.length - 1].d === snap.d) days[days.length - 1] = snap;
+  else days.push(snap);
+}
+
+/** Valeurs d'une journée. */
+export interface DayPoint {
+  d: number;
+  revenue: number;
+  opex: number;
+  profit: number;
+  flights: number;
+  pax: number;
+  cargoT: number;
+  cash: number;
+}
+
+/**
+ * Le mois jour par jour, à partir des relevés. Pour le mois en cours, `live`
+ * (le cumul actuel, jour `liveDay`) ajoute la journée qui n'est pas finie.
+ */
+export function dailySeries(l: MonthLedger, live?: { d: number; cash: number }): DayPoint[] {
+  const snaps = [...(l.days ?? [])];
+  if (live && (!snaps.length || snaps[snaps.length - 1].d < live.d)) {
+    const sum = summarize(l);
+    snaps.push({ d: live.d, revenue: sum.revenue, opex: sum.opex + sum.tax, flights: l.flights, pax: l.pax, cargoT: l.cargoT, cash: live.cash });
+  }
+  let prev: DaySnap = { d: 0, revenue: 0, opex: 0, flights: 0, pax: 0, cargoT: 0, cash: 0 };
+  return snaps.map((c) => {
+    const p: DayPoint = {
+      d: c.d,
+      revenue: c.revenue - prev.revenue,
+      opex: c.opex - prev.opex,
+      profit: c.revenue - prev.revenue - (c.opex - prev.opex),
+      flights: c.flights - prev.flights,
+      pax: c.pax - prev.pax,
+      cargoT: c.cargoT - prev.cargoT,
+      cash: c.cash,
+    };
+    prev = c;
+    return p;
+  });
+}
+
 /** Clôture du mois : impôt (avec report des pertes), archivage, prix du kérosène du mois suivant. */
 export function closeMonth(ctx: Ctx, t: number): void {
   const s = ctx.state;
@@ -110,6 +168,7 @@ export function closeMonth(ctx: Ctx, t: number): void {
     book(s, 'tax', tax);
   }
   s.ledger.cashEnd = s.cash;
+  snapDay(s, t);
   const closed = s.ledger;
   s.history.push(closed);
   if (s.history.length > HISTORY_MONTHS) s.history.splice(0, s.history.length - HISTORY_MONTHS);

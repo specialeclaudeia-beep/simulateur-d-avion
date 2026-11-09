@@ -1,11 +1,11 @@
-import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl';
+import type { ExpressionSpecification, GeoJSONSource, Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl';
 import type { Feature, Point } from 'geojson';
 import type { GameClock } from '../core/clock';
 import { loadWorldData, type WorldData } from '../flights/data';
 import { RealTraffic } from '../flights/realTraffic';
 import type { Flight, FlightProvider } from '../flights/types';
-import { bearing, greatCirclePath, interpolate, toVec, angleBetween, type Vec3 } from '../flights/geo';
-import { addAircraftIcons, iconId, type IconKind } from './aircraftIcons';
+import { bearing, greatCirclePath, hashUnit, interpolate, lateralOffset, toVec, angleBetween, type Vec3 } from '../flights/geo';
+import { accentId, addAircraftIcons, iconId, iconKindFor, liveryOf } from './aircraftIcons';
 import { SLOT } from './layerSlots';
 
 /**
@@ -24,6 +24,25 @@ const SRC = 'aircraft';
 const SRC_TRACK = 'flight-track';
 const LAYER = 'aircraft-icons';
 const LAYER_LABELS = 'aircraft-labels';
+const LAYER_ACCENT = 'aircraft-accents';
+
+/** Taille des avions : envergure réelle du modèle, puis grossie avec le zoom. */
+const ICON_SIZE = [
+  'interpolate',
+  ['exponential', 1.6],
+  ['zoom'],
+  1,
+  ['*', ['get', 'size'], 0.32],
+  4,
+  ['*', ['get', 'size'], 0.5],
+  7,
+  ['*', ['get', 'size'], 0.8],
+  10,
+  ['*', ['get', 'size'], 1.3],
+  14,
+  ['*', ['get', 'size'], 3],
+  
+] as ExpressionSpecification;
 const LAYER_SELECTED = 'aircraft-selected';
 
 /** Nombre maximal d'avions dessinés à la fois (au-delà, on en montre un échantillon stable). */
@@ -38,7 +57,11 @@ interface PlaneProps {
   /** Identifiant de l'avion dans la source (pour retrouver le vol au toucher). */
   key: string;
   icon: string;
+  /** Silhouette des accents (dérive, moteurs, bouts d'ailes). */
+  accentIcon: string;
   color: string;
+  /** Couleur des accents (livrée de la compagnie). */
+  accent: string;
   size: number;
   rot: number;
   label: string;
@@ -47,6 +70,8 @@ interface PlaneProps {
 
 export class AircraftLayer {
   private world: WorldData | null = null;
+  /** Livrée de chaque compagnie (calculée une fois). */
+  private liveries = new Map<string, { from: string; body: string; accent: string }>();
   private real: RealTraffic | null = null;
   private providers = new Set<FlightProvider>();
   private listeners = new Set<Listener>();
@@ -161,8 +186,9 @@ export class AircraftLayer {
     const vb = toVec(b.lon, b.lat);
     const omega = angleBetween(va, vb);
     const frac = (t - f.depMs) / (f.arrMs - f.depMs);
-    const p = interpolate(va, vb, omega, frac, [0, 0]);
-    const ahead = interpolate(va, vb, omega, Math.min(1, frac + 0.002), [0, 0]);
+    const lat = lateralOf(f, omega);
+    const p = interpolate(va, vb, omega, frac, [0, 0], lat);
+    const ahead = interpolate(va, vb, omega, Math.min(1, frac + 0.002), [0, 0], lat);
     return {
       lonLat: [p[0], p[1]],
       heading: frac < 0.998 ? bearing(p[0], p[1], ahead[0], ahead[1]) : bearing(a.lon, a.lat, b.lon, b.lat),
@@ -272,21 +298,7 @@ export class AircraftLayer {
         layout: {
           'icon-image': ['get', 'icon'],
           // Taille : envergure réelle du modèle, puis grossie avec le zoom.
-          'icon-size': [
-            'interpolate',
-            ['exponential', 1.6],
-            ['zoom'],
-            1,
-            ['*', ['get', 'size'], 0.32],
-            4,
-            ['*', ['get', 'size'], 0.5],
-            7,
-            ['*', ['get', 'size'], 0.8],
-            10,
-            ['*', ['get', 'size'], 1.3],
-            14,
-            ['*', ['get', 'size'], 3],
-          ],
+          'icon-size': ICON_SIZE,
           'icon-rotate': ['get', 'rot'],
           'icon-rotation-alignment': 'map',
           'icon-pitch-alignment': 'map',
@@ -300,6 +312,27 @@ export class AircraftLayer {
           'icon-halo-width': ['case', ['==', ['get', 'player'], 1], 1.6, 0.9],
           'icon-halo-blur': 0.3,
         },
+      },
+      SLOT.aircraft,
+    );
+
+    // Livrée : dérive, moteurs et bouts d'ailes dans la seconde couleur de la compagnie.
+    map.addLayer(
+      {
+        id: LAYER_ACCENT,
+        type: 'symbol',
+        source: SRC,
+        layout: {
+          'icon-image': ['get', 'accentIcon'],
+          'icon-size': ICON_SIZE,
+          'icon-rotate': ['get', 'rot'],
+          'icon-rotation-alignment': 'map',
+          'icon-pitch-alignment': 'map',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'symbol-sort-key': ['get', 'size'],
+        },
+        paint: { 'icon-color': ['get', 'accent'] },
       },
       SLOT.aircraft,
     );
@@ -410,7 +443,7 @@ export class AircraftLayer {
         this.provided.set(f.id, f);
         const pos = this.positionOf(f, t);
         if (!pos) continue;
-        features.push(this.feature(`p:${f.id}`, f.aircraftId, f.color, pos.lonLat, pos.heading, f.callsign, true));
+        features.push(this.feature(`p:${f.id}`, f.aircraftId, 'player', f.color, pos.lonLat, pos.heading, f.callsign, true));
       }
     }
 
@@ -438,18 +471,20 @@ export class AircraftLayer {
         vB.y = real.airportVec[ib + 1];
         vB.z = real.airportVec[ib + 2];
         const frac = real.progress(i, depMs, t);
-        interpolate(vA, vB, real.omega[i], frac, p);
+        const lat = real.lateral(i, depMs);
+        interpolate(vA, vB, real.omega[i], frac, p, lat);
         if (!view(p[0], p[1])) return;
         inView++;
         const isSel = sel !== null && sel.i === i && sel.depMs === depMs;
         if (!isSel && real.seed[i] > threshold) return;
-        interpolate(vA, vB, real.omega[i], Math.min(1, frac + 0.002), q);
+        interpolate(vA, vB, real.omega[i], Math.min(1, frac + 0.002), q, lat);
         const rot = bearing(p[0], p[1], q[0], q[1]);
         const code = real.airlineCodes[real.airline[i]];
         features.push(
           this.feature(
             `r:${i}:${depMs}`,
             real.modelIds[real.model[i]],
+            code,
             real.airlineColors[real.airline[i]],
             [p[0], p[1]],
             rot,
@@ -470,6 +505,7 @@ export class AircraftLayer {
   private feature(
     key: string,
     modelId: string,
+    airline: string,
     color: string,
     lonLat: [number, number],
     rot: number,
@@ -477,14 +513,19 @@ export class AircraftLayer {
     player: boolean,
   ): Feature<Point, PlaneProps> {
     const model = this.world?.aircraft.get(modelId);
-    const kind: IconKind = model?.category ?? 'narrowbody';
+    const kind = iconKindFor(model);
+    let livery = this.liveries.get(airline);
+    if (!livery || livery.from !== color) {
+      livery = { from: color, ...(airline === 'player' ? { body: color, accent: '#ffffff' } : liveryOf(airline, color)) };
+      this.liveries.set(airline, livery);
+    }
     // Taille relative à un A320 (36 m d'envergure) ; un peu plus gros pour le joueur.
     const span = model?.wingspanM ?? 36;
     const size = (0.55 + 0.45 * (span / 36)) * (player ? 1.25 : 1);
     return {
       type: 'Feature',
       geometry: { type: 'Point', coordinates: lonLat },
-      properties: { key, icon: iconId(kind), color, size, rot, label, player: player ? 1 : 0 },
+      properties: { key, icon: iconId(kind), accentIcon: accentId(kind), color: livery.body, accent: livery.accent, size, rot, label, player: player ? 1 : 0 },
     };
   }
 
@@ -536,8 +577,9 @@ export class AircraftLayer {
 
     const a = this.world.airports.get(f.from)!;
     const b = this.world.airports.get(f.to)!;
-    const done = greatCirclePath(a.lon, a.lat, b.lon, b.lat, 0, pos.progress);
-    const todo = greatCirclePath(a.lon, a.lat, b.lon, b.lat, pos.progress, 1);
+    const lat = lateralOf(f, angleBetween(toVec(a.lon, a.lat), toVec(b.lon, b.lat)));
+    const done = greatCirclePath(a.lon, a.lat, b.lon, b.lat, 0, pos.progress, lat);
+    const todo = greatCirclePath(a.lon, a.lat, b.lon, b.lat, pos.progress, 1, lat);
     // Raccorde les deux morceaux sans saut de longitude.
     const shift = done[done.length - 1][0] - todo[0][0];
     for (const pt of todo) pt[0] += shift;
@@ -554,6 +596,11 @@ export class AircraftLayer {
 
     if (this.following && !map.isMoving()) map.jumpTo({ center: pos.lonLat });
   }
+}
+
+/** Écart latéral d'un vol : fourni par le trafic réel, sinon tiré de son identifiant. */
+function lateralOf(f: Flight, omega: number): number {
+  return f.lateral ?? lateralOffset(hashUnit(f.id), omega);
 }
 
 export interface FlightPosition {

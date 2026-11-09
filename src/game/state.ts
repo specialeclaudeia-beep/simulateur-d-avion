@@ -232,6 +232,23 @@ export interface MonthLedger {
   cargoT: number;
   /** Trésorerie à la fin du mois (remplie à la clôture). */
   cashEnd?: number;
+  /**
+   * Cumuls du mois relevés à la fin de chaque jour (UTC), pour les graphiques
+   * jour par jour. Absent dans les parties d'avant ce relevé.
+   */
+  days?: DaySnap[];
+}
+
+/** Cumul du mois à la fin d'un jour : la différence entre deux relevés donne le jour. */
+export interface DaySnap {
+  /** Jour du mois (1 à 31). */
+  d: number;
+  revenue: number;
+  opex: number;
+  flights: number;
+  pax: number;
+  cargoT: number;
+  cash: number;
 }
 
 // ───────────────────────── Journal et réglages ─────────────────────────

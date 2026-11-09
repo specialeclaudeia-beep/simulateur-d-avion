@@ -80,7 +80,13 @@ function randomFamily(ctx: Ctx, stars: number, exclude: string[]): string {
 }
 
 /** Un candidat au hasard ; `family` impose sa qualification (avec les étoiles qu'il faut pour elle). */
-function newCandidate(ctx: Ctx, t: number, family?: { name: string; models: AircraftModel[] }): PilotCandidate {
+/** Prénoms déjà portés par les pilotes et les candidats (à éviter pour les nouveaux). */
+export function takenFirstNames(ctx: Ctx, more: { firstName: string }[] = []): Set<string> {
+  const s = ctx.state;
+  return new Set([...s.pilots, ...(s.market?.pilots ?? []), ...more].map((p) => p.firstName));
+}
+
+function newCandidate(ctx: Ctx, t: number, family?: { name: string; models: AircraftModel[] }, batch: PilotCandidate[] = []): PilotCandidate {
   const { data, rng, state } = ctx;
   const nationality = rng() < 0.7 ? state.company.country : pick(rng, data.playableCountries()).code;
   const pool = namePoolFor(nationality, data.country(nationality)?.continent);
@@ -92,7 +98,7 @@ function newCandidate(ctx: Ctx, t: number, family?: { name: string; models: Airc
   const salary = Math.round((baseSalary(data, state, stars) * (0.92 + rng() * 0.2)) / 100) * 100;
   return {
     id: `C${++state.counters.candidate}`,
-    ...randomName(rng, pool),
+    ...randomName(rng, pool, takenFirstNames(ctx, batch)),
     nationality,
     birthYear: utcYear(t) - Math.round(23 + hours / 700 + rng() * 6),
     hours,
@@ -106,7 +112,7 @@ function newCandidate(ctx: Ctx, t: number, family?: { name: string; models: Airc
 /** Nouvelle liste de pilotes à recruter. */
 export function generateCandidates(ctx: Ctx, t: number, count = PILOT_MARKET_SIZE): PilotCandidate[] {
   const out: PilotCandidate[] = [];
-  for (let i = 0; i < count; i++) out.push(newCandidate(ctx, t));
+  for (let i = 0; i < count; i++) out.push(newCandidate(ctx, t, undefined, out));
   return out.sort((a, b) => b.stars - a.stars || a.salary - b.salary);
 }
 

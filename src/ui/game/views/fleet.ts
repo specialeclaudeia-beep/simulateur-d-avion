@@ -9,7 +9,7 @@ import { YEAR, ageYears, aircraftValue, blockMinutes, pilotProblem, routeProblem
 import { orderQuote } from '../../../game/fleet';
 import { maintenanceQuote, repairQuote } from '../../../game/sim';
 import type { Aircraft } from '../../../game/state';
-import { badge, bar, btn, dateLong, empty, esc, flagEmoji, kv, money, note, num, pct, row, section, signedMoneyHtml, stars, when } from '../dom';
+import { avatar, badge, bar, btn, dateLong, empty, esc, flagEmoji, kv, money, note, num, pct, row, section, signedMoneyHtml, stars, when } from '../dom';
 import type { Ui, View } from '../ui';
 import { aircraftName, cityOf, pilotFullName, place, statusOf } from './common';
 import { openLineView } from './lines';
@@ -119,13 +119,21 @@ export function aircraftView(ui: Ui, id: string): View {
       if (ac.status === 'broken') {
         const q = repairQuote(ui.ctx, ac);
         main.unshift(btn(`🔧 Réparer · ${money(q.cost)}`, 'repair'));
-      } else if (canService) {
+      } else {
+        // Toujours affiché (grisé quand c'est impossible) : sinon, en vitesse ×10 000, le
+        // bouton apparaît et disparaît à chaque escale et toute la fiche saute.
         const q = maintenanceQuote(ui.ctx, ac);
-        main.push(btn(`🛠️ Révision · ${money(q.cost)} · ${q.hours} h`, 'service', { cls: 'ghost' }));
+        main.push(
+          btn(`🛠️ Révision · ${money(q.cost)} · ${q.hours} h`, 'service', {
+            cls: 'ghost',
+            disabled: !canService,
+            extra: canService ? '' : ' title="Possible seulement quand l’avion est au sol à un hub"',
+          }),
+        );
       }
 
       const pilotBlock = pilot
-        ? `<div class="g-card g-inline"><span>🧑‍✈️ <b>${esc(pilotFullName(pilot))}</b> ${stars(pilot.stars)}</span>
+        ? `<div class="g-card g-inline"><span class="g-person">${avatar(pilot)} <b>${esc(pilotFullName(pilot))}</b> ${stars(pilot.stars)}</span>
              <span>${btn('Changer', 'pickPilot', { cls: 'ghost small' })}${btn('Retirer', 'unassign', { cls: 'ghost small' })}</span></div>`
         : `${note('Sans pilote, l’avion reste au sol.', 'warn')}${btn('🧑‍✈️ Choisir un pilote', 'pickPilot')}`;
 
@@ -148,7 +156,7 @@ export function aircraftView(ui: Ui, id: string): View {
       return `
         <div class="g-card">
           <p class="g-title-line">${modelIcon(m)} <b>${esc(mfr?.name ?? '')} ${esc(m.name)}</b> · ${capacity(m)}</p>
-          <p>${badge(st.label, st.tone)} ${st.detail}</p>
+          <p class="g-status-line">${badge(st.label, st.tone)} ${st.detail}</p>
           <p class="g-cond">État ${bar(ac.condition / 100)} <b>${Math.round(ac.condition)}\u202f%</b></p>
           <div class="g-actions">${main.join('')}</div>
         </div>
@@ -263,7 +271,7 @@ function pilotPickView(ui: Ui, acId: string): View {
               return row({
                 action: 'pick',
                 id: p.id,
-                icon: '🧑‍✈️',
+                icon: avatar(p),
                 title: `${esc(pilotFullName(p))} ${stars(p.stars)}`,
                 sub: other ? `Pilote déjà ${esc(aircraftName(other))} : il changera d’avion` : `Disponible · ${num(p.hours)} h de vol`,
               });

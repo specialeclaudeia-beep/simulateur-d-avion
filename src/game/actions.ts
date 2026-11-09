@@ -27,7 +27,7 @@ import { orderQuote } from './fleet';
 import { HUB_UPGRADE_LABEL, hubPrice, hubResale, hubValue, newHub, upgradeInfo, type HubUpgrade } from './hubs';
 import { earn, money, spend } from './ledger';
 import { randomName, namePoolFor, randomRegistration } from './names';
-import { baseSalary, ensureQualifiedCandidate, pilotName, trainingCost, typeRatingSpec } from './pilots';
+import { baseSalary, ensureQualifiedCandidate, pilotName, takenFirstNames, trainingCost, typeRatingSpec } from './pilots';
 import { aircraftDailyDepartures, basedAircraft, hubDepartures, programLines } from './schedule';
 import { isPlayerHub, maintenanceQuote, planNext, repairQuote, startMaintenance, startRepair } from './sim';
 import { emptyStats, type Aircraft, type Hub, type Line, type Pilot } from './state';
@@ -490,7 +490,7 @@ export function trainNewPilot(ctx: Ctx, t: number, family: string): ActionResult
   if (no) return no;
   spend(s, 'training', cost);
   const country = s.company.country;
-  const name = randomName(ctx.rng, namePoolFor(country, data.country(country)?.continent));
+  const name = randomName(ctx.rng, namePoolFor(country, data.country(country)?.continent), takenFirstNames(ctx));
   const p: Pilot = {
     id: `P${++s.counters.pilot}`,
     ...name,
