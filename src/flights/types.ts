@@ -34,6 +34,8 @@ export interface Flight {
   registration?: string;
   /** Identifiant de l'avion dans l'état du jeu (vols du joueur). */
   ref?: string;
+  /** Écart latéral par rapport au grand cercle (radians, voir lateralOffset). */
+  lateral?: number;
 }
 
 /**

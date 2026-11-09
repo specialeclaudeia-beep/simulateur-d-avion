@@ -36,7 +36,7 @@ export function distanceKm(lon1: number, lat1: number, lon2: number, lat2: numbe
  * Point à la fraction `f` (0 → départ, 1 → arrivée) du grand cercle.
  * Écrit lon/lat dans `out` (évite de créer des objets à chaque image).
  */
-export function interpolate(a: Vec3, b: Vec3, omega: number, f: number, out: [number, number]): [number, number] {
+export function interpolate(a: Vec3, b: Vec3, omega: number, f: number, out: [number, number], lateral = 0): [number, number] {
   let x: number, y: number, z: number;
   if (omega < 1e-9) {
     x = a.x;
@@ -49,10 +49,39 @@ export function interpolate(a: Vec3, b: Vec3, omega: number, f: number, out: [nu
     x = ka * a.x + kb * b.x;
     y = ka * a.y + kb * b.y;
     z = ka * a.z + kb * b.z;
+    if (lateral !== 0) {
+      // Décalage sur le côté (perpendiculaire à la route), nul au départ et à l'arrivée.
+      const d = (lateral * Math.sin(Math.PI * f)) / s;
+      x += (a.y * b.z - a.z * b.y) * d;
+      y += (a.z * b.x - a.x * b.z) * d;
+      z += (a.x * b.y - a.y * b.x) * d;
+    }
   }
   out[0] = Math.atan2(y, x) * DEG;
   out[1] = Math.atan2(z, Math.sqrt(x * x + y * y)) * DEG;
   return out;
+}
+
+/**
+ * Écart latéral d'un vol (radians, signé) à partir d'un nombre au hasard
+ * `u` dans [0, 1) : les avions d'une même ligne ne se suivent plus à la file
+ * sur un trait parfait, ils s'étalent dans un couloir (jusqu'à ±40 km sur les
+ * longues routes, moins sur les courtes). Les vols aller et retour passent
+ * naturellement de part et d'autre.
+ */
+export function lateralOffset(u: number, omega: number): number {
+  const maxKm = Math.min(40, omega * EARTH_KM * 0.035);
+  return ((u * 2 - 1) * maxKm) / EARTH_KM;
+}
+
+/** Nombre stable dans [0, 1) à partir d'un texte (ex. l'identifiant d'un vol). */
+export function hashUnit(text: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x2c1b3c6d);
+  h ^= h >>> 12;
+  return (h >>> 0) / 4294967296;
 }
 
 /** Cap (degrés, 0 = nord, sens horaire) pour aller de p1 vers p2. */
@@ -77,6 +106,7 @@ export function greatCirclePath(
   lat2: number,
   from = 0,
   to = 1,
+  lateral = 0,
 ): [number, number][] {
   const a = toVec(lon1, lat1);
   const b = toVec(lon2, lat2);
@@ -86,7 +116,7 @@ export function greatCirclePath(
   const p: [number, number] = [0, 0];
   let prevLon = NaN;
   for (let i = 0; i <= n; i++) {
-    interpolate(a, b, omega, from + ((to - from) * i) / n, p);
+    interpolate(a, b, omega, from + ((to - from) * i) / n, p, lateral);
     let lon = p[0];
     if (!Number.isNaN(prevLon)) {
       while (lon - prevLon > 180) lon -= 360;

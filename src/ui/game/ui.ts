@@ -238,6 +238,10 @@ export class Ui {
   private setExpanded(on: boolean): void {
     this.expanded = on;
     this.sheet.classList.toggle('expanded', on);
+    document.body.classList.toggle('sheet-expanded', on);
+    const b = this.sheet.querySelector<HTMLButtonElement>('.g-expand')!;
+    b.textContent = on ? '⤡' : '⤢';
+    b.setAttribute('aria-label', on ? 'Réduire' : 'Agrandir en plein écran');
   }
 
   // ── Dessin ──

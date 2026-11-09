@@ -366,3 +366,26 @@ describe('horloge', () => {
     expect(Math.abs(behind.now() - Date.now())).toBeLessThan(5000);
   });
 });
+
+describe('variété et trajectoires', () => {
+  it('les candidats d’une même semaine ont des prénoms différents', () => {
+    const ctx = newTestGame();
+    const names = ctx.state.market.pilots.map((c) => c.firstName);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('les avions s’écartent de la ligne en vol mais partent et arrivent au bon endroit', async () => {
+    const { interpolate, lateralOffset, toVec, angleBetween, distanceKm } = await import('../src/flights/geo');
+    const a = toVec(2.55, 49.01); // CDG
+    const b = toVec(-73.78, 40.64); // JFK
+    const om = angleBetween(a, b);
+    const lat = lateralOffset(0.99, om);
+    const on = interpolate(a, b, om, 0.5, [0, 0]);
+    const off = interpolate(a, b, om, 0.5, [0, 0], lat);
+    const gap = distanceKm(on[0], on[1], off[0], off[1]);
+    expect(gap).toBeGreaterThan(30);
+    expect(gap).toBeLessThan(41);
+    const start = interpolate(a, b, om, 0, [0, 0], lat);
+    expect(distanceKm(start[0], start[1], 2.55, 49.01)).toBeLessThan(0.01);
+  });
+});

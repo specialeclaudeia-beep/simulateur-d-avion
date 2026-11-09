@@ -1618,3 +1618,213 @@ body.wizard-on .country-card {
   accent-color: var(--g-accent);
   min-height: 32px; /* curseur facile à attraper au doigt */
 }
+
+/* Fiche avion : hauteur fixe de la ligne d'état, pour que la fiche ne saute pas en vitesse rapide. */
+.g-status-line {
+  min-height: 2.9em;
+}
+
+/* ═════════════════════════ Refonte visuelle (menus, personnes) ═════════════════════════ */
+
+/* Barre du bas : onglet actif en pastille lumineuse. */
+.g-nav {
+  background: linear-gradient(180deg, rgba(16, 25, 52, 0.97), rgba(7, 12, 28, 0.98));
+}
+
+.g-tab {
+  border-top: 0 !important;
+}
+
+.g-tab-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 28px;
+  border-radius: 14px;
+  transition:
+    background 0.2s,
+    transform 0.2s;
+}
+
+.g-tab.active .g-tab-icon {
+  background: linear-gradient(180deg, rgba(107, 182, 255, 0.35), rgba(47, 134, 232, 0.25));
+  box-shadow: inset 0 0 0 1px rgba(107, 182, 255, 0.45);
+  transform: translateY(-1px);
+}
+
+.g-tab.active small {
+  color: #9fd0ff;
+  font-weight: 700;
+}
+
+/* Feuille : en-tête dégradé, titre plus marqué. */
+.g-sheet {
+  background: linear-gradient(180deg, rgba(14, 22, 46, 0.98), rgba(8, 13, 30, 0.98));
+  transition:
+    height 0.28s cubic-bezier(0.3, 1, 0.4, 1),
+    top 0.28s,
+    border-radius 0.28s;
+}
+
+.g-sheet-head {
+  background: linear-gradient(180deg, rgba(77, 163, 255, 0.1), transparent);
+  border-radius: 18px 18px 0 0;
+}
+
+.g-sheet-title {
+  font-size: 18px;
+  letter-spacing: 0.01em;
+}
+
+.g-icon-btn {
+  border: 1px solid transparent;
+}
+
+.g-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.g-expand {
+  font-size: 19px;
+}
+
+/* Agrandir = vraiment plein écran (par-dessus l'horloge), seule la barre du bas reste. */
+.g-sheet.expanded {
+  top: env(safe-area-inset-top);
+  height: auto;
+  border-radius: 0;
+  z-index: 35;
+}
+
+.g-sheet.expanded .g-sheet-head {
+  border-radius: 0;
+}
+
+.g-sheet.expanded .g-body {
+  padding-left: max(14px, calc((100% - 760px) / 2));
+  padding-right: max(14px, calc((100% - 760px) / 2));
+}
+
+/* Sections : titre avec un trait de couleur. */
+.g-h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #b9c8ea;
+}
+
+.g-h3::before {
+  content: '';
+  flex: none;
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--g-accent);
+}
+
+.g-card .g-h3::before {
+  display: none;
+}
+
+/* Cartes et lignes : léger relief. */
+.g-card,
+.g-row {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.03));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+.g-row {
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.g-row:hover {
+  border-color: rgba(107, 182, 255, 0.4);
+}
+
+.g-row:active {
+  background: rgba(77, 163, 255, 0.12);
+}
+
+.g-btn:not(.ghost):not(.danger) {
+  background: linear-gradient(180deg, #6bb6ff, #3a8ef0);
+  box-shadow: 0 3px 12px rgba(58, 142, 240, 0.35);
+}
+
+/* Personnes : pastille à initiales + drapeau. */
+.g-row-icon:has(.g-avatar) {
+  width: auto;
+}
+
+.g-avatar {
+  position: relative;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, hsl(var(--h) 65% 58%), hsl(calc(var(--h) + 40) 60% 38%));
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.12),
+    0 3px 8px rgba(0, 0, 0, 0.35);
+  vertical-align: middle;
+}
+
+.g-avatar b {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.g-avatar i {
+  position: absolute;
+  right: -4px;
+  bottom: -3px;
+  font-size: 14px;
+  font-style: normal;
+  line-height: 1;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
+}
+
+.g-avatar.l {
+  width: 54px;
+  height: 54px;
+}
+
+.g-avatar.l b {
+  font-size: 19px;
+}
+
+.g-avatar.l i {
+  font-size: 18px;
+}
+
+.g-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+@media (min-width: 900px) {
+  .g-expand {
+    display: inline-block !important;
+  }
+
+  .g-sheet.expanded {
+    top: 12px;
+    bottom: calc(var(--nav-h) + 24px);
+    left: 12px;
+    right: 12px;
+    width: auto;
+    height: auto;
+    border-radius: 16px;
+  }
+}
+
+.g-sheet.expanded {
+  background: #0a1128;
+}

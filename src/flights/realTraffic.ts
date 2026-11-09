@@ -12,7 +12,7 @@
  */
 import type { Flight } from './types';
 import type { WorldData } from './data';
-import { angleBetween, EARTH_KM, toVec } from './geo';
+import { angleBetween, EARTH_KM, lateralOffset, toVec } from './geo';
 
 const DAY = 86_400_000;
 const MIN = 60_000;
@@ -203,6 +203,11 @@ export class RealTraffic {
     return Math.min(1, Math.max(0, (t - depMs) / (this.durMin[i] * MIN)));
   }
 
+  /** Écart latéral de ce vol ce jour-là (stable). */
+  lateral(i: number, depMs: number): number {
+    return lateralOffset(rnd(this.seed[i] ^ Math.floor(depMs / 60_000), 11), this.omega[i]);
+  }
+
   /** Fiche complète d'un vol (créée seulement à la demande). */
   flight(i: number, depMs: number): Flight {
     const code = this.airlineCodes[this.airline[i]];
@@ -220,6 +225,7 @@ export class RealTraffic {
       to: this.airportCodes[this.to[i]],
       depMs,
       arrMs: depMs + this.durMin[i] * MIN,
+      lateral: this.lateral(i, depMs),
     };
     // Remplissage stable pour ce vol et ce jour : 60 à 98 % (moyenne mondiale ~83 %).
     const load = 0.6 + 0.38 * Math.sqrt(rnd(seed ^ Math.floor(depMs / DAY), 7));
