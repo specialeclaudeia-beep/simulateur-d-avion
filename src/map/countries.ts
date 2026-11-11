@@ -76,6 +76,11 @@ export class Countries {
     return () => this.listeners.delete(fn);
   }
 
+  /** Un pays est-il sélectionné ? */
+  get hasSelection(): boolean {
+    return this.selectedId !== null;
+  }
+
   clearSelection(): void {
     this.setSelected(null);
     for (const fn of this.listeners) fn(null);

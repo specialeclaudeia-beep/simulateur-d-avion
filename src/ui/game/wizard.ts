@@ -536,7 +536,8 @@ export function runWizard(deps: WizardDeps): WizardHandle {
 
   render();
   return {
-    back: () => (st.step === 0 ? cancel() : goBack()),
+    // À la première étape, comme le bouton ✕ : un nom déjà écrit demande une confirmation.
+    back: () => (st.step === 0 ? cancelBtn.click() : goBack()),
     cancel,
   };
 }

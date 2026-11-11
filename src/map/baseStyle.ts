@@ -37,6 +37,10 @@ const WATER_TEXT = '#b9d4f5';
 
 /** Niveau de détail minimal pour afficher un calque (voir applyDetail). */
 const DETAIL_OF: Record<string, Quality> = {};
+/** Calques de texte du fond de carte (noms de pays, de villes, de mers…). */
+const LABEL_LAYERS = new Set<string>();
+let labelsOn = true;
+let currentDetail: Quality = 'high';
 const need = (level: Quality, layer: LayerSpecification): LayerSpecification => {
   DETAIL_OF[layer.id] = level;
   return layer;
@@ -438,6 +442,7 @@ export function baseStyle(): StyleSpecification {
     emptySlot(SLOT.aircraft),
     emptySlot(SLOT.overlay),
   ];
+  for (const layer of layers) if (layer.type === 'symbol') LABEL_LAYERS.add(layer.id);
 
   return {
     version: 8,
@@ -471,11 +476,26 @@ export function baseStyle(): StyleSpecification {
 
 const RANK: Record<Quality, number> = { low: 0, medium: 1, high: 2 };
 
+function layerVisible(id: string): boolean {
+  if (!labelsOn && LABEL_LAYERS.has(id)) return false;
+  const level = DETAIL_OF[id];
+  return !level || RANK[currentDetail] >= RANK[level];
+}
+
 /** Affiche ou masque les calques selon le niveau de détail choisi dans les paramètres. */
 export function applyDetail(map: MapLibreMap, detail: Quality): void {
-  for (const [id, level] of Object.entries(DETAIL_OF)) {
-    if (!map.getLayer(id)) continue;
-    map.setLayoutProperty(id, 'visibility', RANK[detail] >= RANK[level] ? 'visible' : 'none');
+  currentDetail = detail;
+  for (const id of Object.keys(DETAIL_OF)) {
+    if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', layerVisible(id) ? 'visible' : 'none');
+  }
+}
+
+/** Affiche ou masque tous les noms de la carte (masqués derrière la page d'accueil, pour un globe nu). */
+export function setLabels(map: MapLibreMap, on: boolean): void {
+  if (labelsOn === on) return;
+  labelsOn = on;
+  for (const id of LABEL_LAYERS) {
+    if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', layerVisible(id) ? 'visible' : 'none');
   }
 }
 
