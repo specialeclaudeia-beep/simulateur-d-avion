@@ -1,4 +1,6 @@
 import './style.css';
+import { installFrameGovernor, setFpsLimit } from './core/frames';
+import { settings } from './core/settings';
 import { GameClock } from './core/clock';
 import { createMap } from './map/createMap';
 import { Countries } from './map/countries';
@@ -47,6 +49,10 @@ async function start(): Promise<void> {
 
   await mountGame({ map, clock, countries, aircraft, network, onTimeJump: () => dayNight.refresh() });
 }
+
+// Cadence des images (limite de FPS des paramètres) : en place avant la carte.
+installFrameGovernor(settings.get().fps);
+settings.onChange((s, changed) => changed.fps !== undefined && setFpsLimit(s.fps));
 
 // Appli installable et jeu hors connexion, prêts avant même la carte.
 setupPwa();

@@ -198,6 +198,29 @@ export class RealTraffic {
     }
   }
 
+  /**
+   * Appelle `fn(i, depMs)` pour chaque vol en l'air à un moment quelconque
+   * entre `t0` et `t1` : déjà en vol à `t0`, ou qui décolle avant `t1`.
+   */
+  forEachActive(t0: number, t1: number, fn: (i: number, depMs: number) => void): void {
+    const first = Math.floor((t0 - this.maxDurMs) / DAY);
+    const last = Math.floor(t1 / DAY);
+    for (let d = first; d <= last; d++) {
+      const dayStart = d * DAY;
+      const weekday = (((d + 3) % 7) + 7) % 7;
+      const bit = 1 << weekday;
+      const from = t0 - dayStart;
+      const until = t1 - dayStart;
+      for (let i = 0; i < this.count; i++) {
+        const dep = this.depMin[i] * MIN;
+        if (dep >= until) continue;
+        if (dep + this.durMin[i] * MIN <= from) continue;
+        if ((this.days[i] & bit) === 0) continue;
+        fn(i, dayStart + dep);
+      }
+    }
+  }
+
   /** Fraction du trajet effectuée (0 → 1). */
   progress(i: number, depMs: number, t: number): number {
     return Math.min(1, Math.max(0, (t - depMs) / (this.durMin[i] * MIN)));

@@ -512,3 +512,8 @@ body {
     display: none;
   }
 }
+
+/* Souris au-dessus d'un avion (ordinateur) : il est cliquable. */
+.maplibregl-canvas-container.maplibregl-interactive.plane-hover {
+  cursor: pointer;
+}

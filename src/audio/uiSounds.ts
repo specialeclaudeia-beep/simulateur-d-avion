@@ -114,7 +114,7 @@ export function mountUiSounds(map: MapLibreMap, aircraft: AircraftLayer): void {
       if (el.matches('.g-back')) ui('ui_back');
       else if (el.matches('.g-tab, .g-nav-company')) ui('ui_tab_switch');
       else if (el.matches('.g-row')) ui('ui_page_turn');
-      else if (el.matches('.hud-speed')) ui(el.textContent === '⏸' ? 'clock_tick' : 'ui_progress', 0.8);
+      else if (el.matches('.hud-speed')) ui(el.matches('.hud-pause') ? 'clock_tick' : 'ui_progress', 0.8);
       else if (el.matches('.hud-now')) ui('ui_countdown_beep');
       else if (el.matches('.hud-globe')) ui('ui_zoom_out');
       else if (el.matches('.fc-follow')) ui('ui_zoom_in');

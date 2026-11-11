@@ -76,19 +76,28 @@ export function mountHud(root: HTMLElement, clock: GameClock, map: MapLibreMap, 
   clock.onChange(refreshSpeed);
   refreshSpeed();
 
+  // L'heure est relue à chaque image (elle peut filer en ×10 000), mais l'écran
+  // n'est touché que si un texte change : une fois par seconde en temps réel.
+  let shownMinute = Number.NaN;
   const render = () => {
-    const d = new Date(clock.now());
-    dateEl.textContent = dateFmt.format(d);
-    dateShortEl.textContent = dateShortFmt.format(d);
+    requestAnimationFrame(render);
+    const now = clock.now();
+    const d = new Date(now);
+    const sec = `:${String(d.getSeconds()).padStart(2, '0')}`;
+    if (secEl.textContent !== sec) secEl.textContent = sec;
     // « Maintenant » ne sert qu'à rattraper l'heure réelle : jamais à revenir en arrière.
     const behind = clock.behindRealTime;
     if (nowBtn.hidden === behind) nowBtn.hidden = !behind;
-    const hm = timeFmt.format(d);
-    if (hmEl.textContent !== hm) hmEl.textContent = hm;
-    const sec = `:${String(d.getSeconds()).padStart(2, '0')}`;
-    if (secEl.textContent !== sec) secEl.textContent = sec;
+    const minute = Math.floor(now / 60_000);
+    if (minute === shownMinute) return;
+    shownMinute = minute;
+    hmEl.textContent = timeFmt.format(d);
     utcEl.textContent = `${utcFmt.format(d)} UTC`;
-    requestAnimationFrame(render);
+    const date = dateFmt.format(d);
+    if (dateEl.textContent !== date) {
+      dateEl.textContent = date;
+      dateShortEl.textContent = dateShortFmt.format(d);
+    }
   };
   render();
 }
