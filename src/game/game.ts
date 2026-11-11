@@ -4,13 +4,14 @@
  * prévient l'interface (changements, nouveaux événements).
  */
 import type { GameClock, Speed } from '../core/clock';
+import { nextLevel, restartLevel, type LevelChoice } from './campaignFlow';
 import { DAY, OFFLINE_MAX_MS } from './config';
 import { invalidate, type ActionResult, type Ctx, makeCtx } from './context';
 import type { GameData } from './data';
 import { setFlightSource } from './flights';
 import { createNewGame, type NewGameParams } from './newGame';
 import { advance } from './sim';
-import { loadFromStorage, saveToStorage, type LoadResult, type SaveFile } from './save';
+import { lastSlot, loadFromStorage, saveToStorage, slotOf, type LoadResult, type SaveFile, type SlotId } from './save';
 import type { GameState, LogEntry } from './state';
 
 type Listener = () => void;
@@ -104,19 +105,54 @@ export class Game {
     return summary;
   }
 
-  /** Lit la sauvegarde du navigateur et la charge si elle existe. */
-  resume(): { result: LoadResult; summary: AwaySummary | null } {
-    const result = loadFromStorage();
+  /** Lit la sauvegarde d'un emplacement (par défaut : le dernier joué) et la charge si elle existe. */
+  resume(slot: SlotId = lastSlot() ?? 'concurrence'): { result: LoadResult; summary: AwaySummary | null } {
+    const result = loadFromStorage(slot);
     if (result.status !== 'ok') return { result, summary: null };
     return { result, summary: this.loadSave(result.save) };
   }
 
-  /** Abandonne la partie en cours (la sauvegarde est effacée par l'appelant). */
+  /** Emplacement de sauvegarde de la partie en cours. */
+  get slot(): SlotId | null {
+    return this.ctx ? slotOf(this.ctx.state) : null;
+  }
+
+  /**
+   * Quitte la partie en cours sans l'enregistrer : à l'appelant de le faire
+   * avant (retour à l'accueil) ou d'effacer la sauvegarde (abandon).
+   */
   quit(): void {
+    window.clearTimeout(this.saveSoon);
     this.ctx = null;
+    this.dirty = false;
     window.clearInterval(this.timer);
     this.timer = 0;
     this.emitChange();
+  }
+
+  // ── Mode par échelons ──
+
+  /** Part dans le pays suivant, avec les améliorations choisies. */
+  nextLevel(choice: LevelChoice): ActionResult {
+    const res = this.run(nextLevel, choice);
+    if (res.ok) this.saveNow();
+    return res;
+  }
+
+  /** Recommence l'échelon en cours (possible même après une faillite). */
+  restartLevel(hub?: string): ActionResult {
+    const ctx = this.ctx;
+    if (!ctx) return { ok: false, error: 'Aucune partie en cours.' };
+    const t = Math.max(ctx.state.time, Math.round(this.clock.now()));
+    advance(ctx, t);
+    const res = restartLevel(ctx, t, hub);
+    if (res.ok) {
+      invalidate(ctx);
+      this.dirty = true;
+      this.saveNow();
+    }
+    this.emitChange();
+    return res;
   }
 
   private afterStart(): void {

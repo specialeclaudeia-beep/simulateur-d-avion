@@ -1,15 +1,40 @@
 /**
  * Sauvegarde locale (dans le navigateur) et export / import d'un fichier.
  *
- * Chaque sauvegarde porte un numéro de version. Si le format change un jour,
- * on ajoute une étape dans `migrate()` pour convertir les anciennes parties :
+ * Il y a un emplacement par mode de jeu : partie libre avec concurrence,
+ * partie libre sans concurrence, mode par échelons. On peut donc mener les
+ * trois de front.
+ *
+ * Chaque sauvegarde porte un numéro de version. Si le format change, on
+ * ajoute une étape dans `migrate()` pour convertir les anciennes parties :
  * une partie existante ne doit jamais être perdue.
  */
-import { DEFAULT_SETTINGS, SAVE_VERSION, type GameState } from './state';
+import { DEFAULT_SETTINGS, SAVE_VERSION, type GameState, type Logo } from './state';
 
 const FORMAT = 'simulateur-compagnie-aerienne';
-const KEY = 'simulateur-compagnie:partie';
-const BROKEN_KEY = 'simulateur-compagnie:partie-illisible';
+
+/** Emplacements de sauvegarde, un par mode de jeu. */
+export type SlotId = 'concurrence' | 'solo' | 'echelons';
+
+export const SLOTS: readonly SlotId[] = ['concurrence', 'solo', 'echelons'];
+
+export const SLOT_LABEL: Record<SlotId, string> = {
+  concurrence: 'Partie libre avec concurrence',
+  solo: 'Partie libre sans concurrence',
+  echelons: 'Mode par échelons',
+};
+
+/**
+ * Clés du navigateur. Celle de la partie libre avec concurrence est la clé
+ * d'origine : les parties d'avant les modes de jeu s'y trouvent déjà.
+ */
+const KEYS: Record<SlotId, string> = {
+  concurrence: 'simulateur-compagnie:partie',
+  solo: 'simulateur-compagnie:partie-sans-concurrence',
+  echelons: 'simulateur-compagnie:partie-echelons',
+};
+const LAST_KEY = 'simulateur-compagnie:derniere';
+const brokenKey = (slot: SlotId) => `${KEYS[slot]}-illisible`;
 
 export interface SaveFile {
   format: typeof FORMAT;
@@ -17,6 +42,12 @@ export interface SaveFile {
   /** Heure réelle de la sauvegarde (pour faire passer le temps pendant l'absence). */
   savedAtReal: number;
   state: GameState;
+}
+
+/** Emplacement où se range une partie, d'après son mode. */
+export function slotOf(state: Pick<GameState, 'mode' | 'competition'>): SlotId {
+  if (state.mode === 'echelons') return 'echelons';
+  return state.competition === false ? 'solo' : 'concurrence';
 }
 
 export function serialize(state: GameState, now = Date.now()): string {
@@ -52,14 +83,22 @@ export function parseSave(text: string): ParseResult {
 /** Convertit une partie d'une ancienne version vers la version actuelle. */
 export function migrate(state: GameState, fromVersion: number): GameState {
   const s = state;
-  // (Version 1 : format d'origine. Les prochaines versions ajouteront leurs étapes ici,
-  //  par exemple : if (fromVersion < 2) { s.nouveauChamp = valeurParDéfaut; })
-  void fromVersion;
+  if (fromVersion < 2) {
+    // Version 2 : modes de jeu. Une partie d'avant est une partie libre avec concurrence.
+    s.mode = 'libre';
+    s.competition = true;
+    s.rivalry = {};
+    s.campaign = null;
+  }
   // Filets de sécurité si un champ manque.
   s.settings = { ...DEFAULT_SETTINGS, ...(s.settings ?? {}) };
   s.log ??= [];
   s.history ??= [];
   s.relations ??= {};
+  s.mode ??= 'libre';
+  s.competition ??= true;
+  s.rivalry ??= {};
+  s.campaign ??= null;
   s.version = SAVE_VERSION;
   return s;
 }
@@ -72,12 +111,14 @@ function storage(): Storage | null {
   }
 }
 
-/** Enregistre la partie. Renvoie false si le navigateur refuse (mode privé, espace plein…). */
+/** Enregistre la partie dans l'emplacement de son mode. Renvoie false si le navigateur refuse (mode privé, espace plein…). */
 export function saveToStorage(state: GameState): boolean {
   const ls = storage();
   if (!ls) return false;
   try {
-    ls.setItem(KEY, serialize(state));
+    const slot = slotOf(state);
+    ls.setItem(KEYS[slot], serialize(state));
+    ls.setItem(LAST_KEY, slot);
     return true;
   } catch {
     return false;
@@ -86,13 +127,13 @@ export function saveToStorage(state: GameState): boolean {
 
 export type LoadResult = { status: 'none' } | { status: 'ok'; save: SaveFile } | { status: 'broken'; error: string };
 
-/** Lit la partie enregistrée. Une sauvegarde illisible est mise de côté, jamais effacée. */
-export function loadFromStorage(): LoadResult {
+/** Lit la partie d'un emplacement. Une sauvegarde illisible est mise de côté, jamais effacée. */
+export function loadFromStorage(slot: SlotId = 'concurrence'): LoadResult {
   const ls = storage();
   if (!ls) return { status: 'none' };
   let text: string | null = null;
   try {
-    text = ls.getItem(KEY);
+    text = ls.getItem(KEYS[slot]);
   } catch {
     return { status: 'none' };
   }
@@ -100,20 +141,103 @@ export function loadFromStorage(): LoadResult {
   const res = parseSave(text);
   if (res.ok) return { status: 'ok', save: res.save };
   try {
-    ls.setItem(BROKEN_KEY, text);
-    ls.removeItem(KEY);
+    ls.setItem(brokenKey(slot), text);
+    ls.removeItem(KEYS[slot]);
   } catch {
     /* tant pis : on garde au moins l'original */
   }
   return { status: 'broken', error: res.error };
 }
 
-export function clearStorage(): void {
+export function clearStorage(slot: SlotId = 'concurrence'): void {
   try {
-    storage()?.removeItem(KEY);
+    storage()?.removeItem(KEYS[slot]);
   } catch {
     /* rien à faire */
   }
+}
+
+/** Dernier emplacement joué (pour « Reprendre »), s'il contient toujours une partie. */
+export function lastSlot(): SlotId | null {
+  const ls = storage();
+  if (!ls) return null;
+  try {
+    const last = ls.getItem(LAST_KEY) as SlotId | null;
+    if (last && SLOTS.includes(last) && ls.getItem(KEYS[last])) return last;
+    return SLOTS.find((slot) => ls.getItem(KEYS[slot])) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** L'essentiel d'une partie enregistrée, pour la page d'accueil. */
+export interface SlotSummary {
+  slot: SlotId;
+  name: string;
+  code: string;
+  color: string;
+  logo: Logo;
+  country: string;
+  cash: number;
+  /** Temps de jeu de la partie et heure réelle de l'enregistrement. */
+  time: number;
+  startedAt: number;
+  savedAtReal: number;
+  hubs: number;
+  aircraft: number;
+  lines: number;
+  flights: number;
+  pax: number;
+  /** Mode par échelons : échelon en cours, pays terminés, campagne finie. */
+  level: number | null;
+  done: { country: string; level: number; days: number; goals: number; profit: number }[];
+  finished: boolean;
+  bankrupt: boolean;
+}
+
+/** Résumé d'un emplacement, ou null s'il est vide (ou illisible). */
+export function slotSummary(slot: SlotId): SlotSummary | null {
+  const ls = storage();
+  if (!ls) return null;
+  try {
+    const text = ls.getItem(KEYS[slot]);
+    if (!text) return null;
+    const file = JSON.parse(text) as SaveFile;
+    const s = file?.state;
+    if (file?.format !== FORMAT || !s?.company?.name) return null;
+    return {
+      slot,
+      name: s.company.name,
+      code: s.company.code,
+      color: s.company.color,
+      logo: s.company.logo,
+      country: s.company.country,
+      cash: s.cash,
+      time: s.time,
+      startedAt: s.startedAt,
+      savedAtReal: file.savedAtReal,
+      hubs: s.hubs?.length ?? 0,
+      aircraft: s.aircraft?.length ?? 0,
+      lines: s.lines?.length ?? 0,
+      flights: s.stats?.flights ?? 0,
+      pax: s.stats?.pax ?? 0,
+      level: s.campaign?.level ?? null,
+      done: s.campaign?.done ?? [],
+      finished: s.campaign?.finished ?? false,
+      bankrupt: !!s.bankrupt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function slotSummaries(): SlotSummary[] {
+  const out: SlotSummary[] = [];
+  for (const slot of SLOTS) {
+    const sum = slotSummary(slot);
+    if (sum) out.push(sum);
+  }
+  return out;
 }
 
 /** Nom de fichier pour l'export, ex. « air-breizh-2026-11-08.json ». */

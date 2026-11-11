@@ -4,6 +4,7 @@
  * billet, avions affectés, résultats, fermeture).
  */
 import * as act from '../../../game/actions';
+import { demandContext } from '../../../game/competition';
 import { PRICE_FACTOR_MAX, PRICE_FACTOR_MIN } from '../../../game/config';
 import type { Route } from '../../../game/data';
 import { domesticVatRate, playerPaxPerDay, referenceFare, routeProblem } from '../../../game/economy';
@@ -32,15 +33,7 @@ function expectedPax(ui: Ui, line: Line, legsPerDay: number): number {
   const d = ui.game.data;
   const route = d.route(line.hub, line.dest);
   if (!route) return 0;
-  const s = ui.game.state;
-  return playerPaxPerDay({
-    route,
-    line,
-    hub: s.hubs.find((h) => h.iata === line.hub),
-    reputation: s.reputation,
-    condition: 90,
-    legsPerDay,
-  });
+  return playerPaxPerDay(demandContext(ui.ctx, line, route, 90, legsPerDay, ui.game.state.time));
 }
 
 /** Les compagnies réelles déjà présentes sur une ligne, en toutes lettres. */

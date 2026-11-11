@@ -35,6 +35,8 @@ import {
   REPAIR_MINOR,
   loanRate,
 } from './config';
+import { evaluate } from './campaign';
+import { dailyCompetition, demandContext } from './competition';
 import { invalidate, log, type Ctx } from './context';
 import {
   ageYears,
@@ -281,14 +283,7 @@ export function depart(ctx: Ctx, ac: Aircraft, from: string, to: string, line: L
   const route = line ? data.route(line.hub, line.dest) : undefined;
   if (line && route) {
     const freq = lineFrequency(ctx, line.id);
-    const dctx = {
-      route,
-      line,
-      hub: s.hubs.find((h) => h.iata === line.hub),
-      reputation: s.reputation,
-      condition: ac.condition,
-      legsPerDay: model.kind === 'pax' ? freq.pax : freq.cargo,
-    };
+    const dctx = demandContext(ctx, line, route, ac.condition, model.kind === 'pax' ? freq.pax : freq.cargo, t);
     const noise = 0.85 + 0.3 * rng();
     if (model.kind === 'pax') {
       const perLeg = playerPaxPerDay(dctx) / Math.max(1, freq.pax);
@@ -539,6 +534,7 @@ function onDay(ctx: Ctx, t: number): void {
   spend(s, 'interest', interest);
 
   if (t - s.market.refreshedAt >= MARKET_REFRESH_DAYS * DAY) refreshMarkets(ctx, t);
+  dailyCompetition(ctx, t);
 
   if (s.cash < 0) {
     s.negativeSince ??= t;
@@ -558,6 +554,7 @@ function onDay(ctx: Ctx, t: number): void {
   } else {
     s.negativeSince = null;
   }
+  evaluate(ctx, t);
   s.nextDay = t + DAY;
 }
 

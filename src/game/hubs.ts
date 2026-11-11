@@ -11,6 +11,7 @@ import {
   MAINTENANCE_MAX,
   QUALITY_MAX,
 } from './config';
+import type { Limits } from './campaign';
 import type { Airport, GameData } from './data';
 import type { GameState, Hub } from './state';
 
@@ -61,8 +62,11 @@ function maxParking(a: Airport): number {
   return Math.max(12, a.gates * 3);
 }
 
-/** Coût et effet de la prochaine amélioration (null si déjà au maximum). */
-export function upgradeInfo(data: GameData, hub: Hub, kind: HubUpgrade): UpgradeInfo | null {
+/**
+ * Coût et effet de la prochaine amélioration (null si déjà au maximum).
+ * `lim` : limites du mode par échelons (qualité et atelier plafonnés), s'il y en a.
+ */
+export function upgradeInfo(data: GameData, hub: Hub, kind: HubUpgrade, lim: Limits | null = null): UpgradeInfo | null {
   const a = data.airport(hub.iata);
   const P = a.price;
   const start = {
@@ -92,26 +96,28 @@ export function upgradeInfo(data: GameData, hub: Hub, kind: HubUpgrade): Upgrade
       return { kind, current: hub.parking, next: Math.min(max, hub.parking + 2), max, cost, effect: '+2 avions basés ici' };
     }
     case 'quality': {
-      if (hub.quality >= QUALITY_MAX) return null;
+      const max = lim ? Math.min(QUALITY_MAX, lim.quality) : QUALITY_MAX;
+      if (hub.quality >= max) return null;
       const cost = round(Math.max(500_000 * hub.quality, P * QUALITY_COST_SHARE[hub.quality]));
       return {
         kind,
         current: hub.quality,
         next: hub.quality + 1,
-        max: QUALITY_MAX,
+        max,
         cost,
         effect: 'Passagers plus satisfaits : plus de clients et meilleure réputation',
       };
     }
     case 'maintenance': {
-      if (hub.maintenance >= MAINTENANCE_MAX) return null;
+      const max = lim ? Math.min(MAINTENANCE_MAX, lim.workshop) : MAINTENANCE_MAX;
+      if (hub.maintenance >= max) return null;
       const cost = round(MAINTENANCE_COST[hub.maintenance] * data.coef(a.country));
       const pct = Math.round(MAINTENANCE_EFFECT[hub.maintenance + 1] * 100);
       return {
         kind,
         current: hub.maintenance,
         next: hub.maintenance + 1,
-        max: MAINTENANCE_MAX,
+        max,
         cost,
         effect: `Révisions et réparations ${pct}\u202f% moins chères et plus rapides, moins de pannes`,
       };

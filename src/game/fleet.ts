@@ -12,6 +12,7 @@ import {
   USED_MAX_AGE,
   volumeShare,
 } from './config';
+import { CLASS_ORDER, limits } from './campaign';
 import type { Ctx } from './context';
 import type { AircraftModel, GameData } from './data';
 import { YEAR, marketValue } from './economy';
@@ -34,7 +35,8 @@ export function orderQuote(data: GameData, state: GameState, model: AircraftMode
   const mfr = data.manufacturerById.get(model.mfr)!;
   const [dMin, dMax] = mfr.contractDiscount ?? [0, 0];
   const loyalty = Math.min(LOYALTY_MAX, Math.floor((state.relations[mfr.id] ?? 0) / LOYALTY_STEP) * 0.01);
-  const discount = Math.min(0.7, dMin + (dMax - dMin) * volumeShare(qty) + loyalty);
+  const perk = limits(state)?.discount ?? 0;
+  const discount = Math.min(0.7, dMin + (dMax - dMin) * volumeShare(qty) + loyalty + perk);
   const unitPrice = Math.round((model.priceUsd * (1 - discount)) / 10_000) * 10_000;
   let first = t + (mfr.deliveryMonths?.[0] ?? 12) * DELIVERY_DAYS_PER_MONTH * DAY;
   // Un avion pas encore certifié ne peut pas être livré avant son année de mise en service.
@@ -56,7 +58,11 @@ const USED_WEIGHT: Record<string, number> = {
 export function generateUsedListings(ctx: Ctx, t: number, count = USED_MARKET_SIZE): UsedListing[] {
   const { data, rng, state } = ctx;
   const year = utcYear(t);
-  const models = data.models.filter((m) => m.eis < year);
+  // Mode par échelons : on ne propose que des avions qu'on a le droit d'acheter.
+  const lim = limits(state);
+  const allowed = (m: AircraftModel) => !lim || (CLASS_ORDER.indexOf(m.category) <= lim.classCap && (m.kind === 'pax' || lim.cargo));
+  const models = data.models.filter((m) => m.eis < year && allowed(m));
+  const perk = 1 - (lim?.discount ?? 0);
   const weights = models.map((m) => (USED_WEIGHT[m.category] ?? 1) * (m.kind === 'cargo' ? 0.5 : 1));
   const out: UsedListing[] = [];
   for (let i = 0; i < count && models.length; i++) {
@@ -72,7 +78,7 @@ export function generateUsedListings(ctx: Ctx, t: number, count = USED_MARKET_SI
       builtAt: t - age * YEAR,
       condition,
       hours: Math.round(age * 2800 * (0.7 + rng() * 0.4)),
-      price: Math.round((marketValue(data, m, age, condition) * (0.92 + rng() * 0.16)) / 10_000) * 10_000,
+      price: Math.round((marketValue(data, m, age, condition) * (0.92 + rng() * 0.16) * perk) / 10_000) * 10_000,
     });
   }
   return out.sort((a, b) => a.price - b.price);
