@@ -435,8 +435,9 @@ export function picksAllowed(c: Campaign): number {
 }
 
 /**
- * À appeler régulièrement (chaque jour de jeu, et après une action) : retient
- * les objectifs atteints et ouvre l'échelon suivant quand il y en a assez.
+ * Appelée par la simulation chaque fois qu'il s'est passé quelque chose (un vol
+ * arrivé, une journée finie) : retient les objectifs atteints et ouvre
+ * l'échelon suivant quand il y en a assez.
  */
 export function evaluate(ctx: Ctx, t: number): void {
   const s = ctx.state;

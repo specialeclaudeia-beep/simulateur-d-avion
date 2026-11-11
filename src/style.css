@@ -9,6 +9,8 @@
   --font: 'Barlow', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-title: 'Barlow Condensed', 'Barlow', system-ui, sans-serif;
   --font-mono: 'B612 Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  /* Montants et grands chiffres : la police du texte (dans la police à chasse fixe, virgules et espaces prennent trop de place). */
+  --font-num: 'Barlow', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
   --ink-0: #03060b;
   --ink-1: #070b14;
@@ -154,8 +156,9 @@ body:not(.game-on) #hud {
   color: var(--fg);
 }
 
+/* Dans cette police à chasse fixe, les deux-points sont collés à gauche de leur case : on les recentre. */
 .hud-hm i {
-  margin: 0 -0.17em;
+  margin: 0 -0.26em 0 0.06em;
   font-style: normal;
   opacity: 0.75;
 }

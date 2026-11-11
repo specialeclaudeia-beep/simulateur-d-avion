@@ -415,7 +415,7 @@ function hubView(ui: Ui, hooks: CampaignHooks, perks: PerkId[], country: string)
         })
         .join('');
       return `
-        <p class="g-lead">Ton hub de départ en ${esc(countryName(ui, country))}. Capital : <b>${money(capital)}</b>.</p>
+        <p class="g-lead">Choisis ton hub de départ (${flagEmoji(country)} ${esc(countryName(ui, country))}). Capital : <b>${money(capital)}</b>.</p>
         ${details}
         <div class="g-list">${rows}</div>
       `;
@@ -436,7 +436,7 @@ function hubView(ui: Ui, hooks: CampaignHooks, perks: PerkId[], country: string)
       void ui
         .confirm({
           title: `Partir à ${airport.city || airport.name} ?`,
-          text: `Ta compagnie quitte ${esc(countryName(ui, s.company.country))} : ses avions et ses hubs sont revendus, et tu repars avec <b>${money(nextCapital(s, perks))}</b>, tes améliorations${
+          text: `Ta compagnie quitte son pays actuel (${flagEmoji(s.company.country)} ${esc(countryName(ui, s.company.country))}) : ses avions et ses hubs y sont revendus, et tu repars avec <b>${money(nextCapital(s, perks))}</b>, tes améliorations${
             pilot ? ` et ton meilleur pilote, ${esc(pilotName(pilot))}` : ''
           }. Ce départ est définitif.`,
           ok: 'Partir',

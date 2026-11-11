@@ -1645,9 +1645,10 @@ body.wizard-on .country-card {
 }
 
 .g-nav-cash {
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  letter-spacing: -0.03em;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .g-tab {
@@ -1898,8 +1899,9 @@ body.wizard-on .country-card {
 
 .g-price,
 .g-option-money {
-  font-family: var(--font-mono);
-  letter-spacing: -0.03em;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }
 
 .g-price {

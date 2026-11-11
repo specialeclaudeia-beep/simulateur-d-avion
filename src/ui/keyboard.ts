@@ -87,7 +87,8 @@ export function mountKeyboard(deps: KeyboardDeps): void {
       return;
     }
     requestAnimationFrame(loop);
-    const dt = last ? Math.min(60, t - last) : 16;
+    // Plafonné : après un à-coup (image très lente), la carte ne fait pas un bond.
+    const dt = last ? Math.min(250, t - last) : 16;
     last = t;
     const dx = (held.has('panRight') ? 1 : 0) - (held.has('panLeft') ? 1 : 0);
     const dy = (held.has('panDown') ? 1 : 0) - (held.has('panUp') ? 1 : 0);
@@ -187,8 +188,10 @@ export function mountKeyboard(deps: KeyboardDeps): void {
 
       const target = e.target as HTMLElement | null;
       if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) {
-        // Dans un champ, seule la touche « retour » agit : elle quitte le champ.
-        if (action === 'back') target.blur();
+        // Dans un champ, seule la touche « retour » agit : elle quitte le champ
+        // (un champ de recherche rempli est d'abord vidé, comme le fait le navigateur).
+        const filledSearch = target instanceof HTMLInputElement && target.type === 'search' && target.value !== '';
+        if (action === 'back' && !filledSearch) target.blur();
         return;
       }
       // Un bouton choisi au clavier (Tab) garde Espace et Entrée pour lui.

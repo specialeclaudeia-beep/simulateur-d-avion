@@ -76,6 +76,7 @@ export function advance(ctx: Ctx, to: number): void {
     s.time = Math.max(s.time, to);
     return;
   }
+  let happened = false;
   for (let guard = 0; guard < 5_000_000; guard++) {
     let best = Infinity;
     let kind = 0;
@@ -112,8 +113,12 @@ export function advance(ctx: Ctx, to: number): void {
     else if (kind === 2) onMonth(ctx, t);
     else if (kind === 3) onTrainingDone(ctx, pilot!, t);
     else onAircraftEvent(ctx, aircraft!, t);
+    happened = true;
     if (s.bankrupt) break;
   }
+  // Mode par échelons : un objectif atteint est annoncé tout de suite (le vol qui
+  // le fait basculer vient d'atterrir), sans attendre la fin de la journée.
+  if (happened && s.campaign) evaluate(ctx, s.time);
   s.time = Math.max(s.time, to);
 }
 

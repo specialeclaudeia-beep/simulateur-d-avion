@@ -402,7 +402,7 @@ export async function mountGame(deps: GameDeps): Promise<GameApp> {
     create: startWizard,
     settings: () => openSettings(),
   });
-  home.show();
+  home.show(true);
 
   // Accès pratique depuis la console du navigateur pour tester.
   Object.assign(window, { game, ui });

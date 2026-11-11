@@ -9,6 +9,7 @@
  */
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { PROFILE_COLORS, PROFILE_EMBLEMS, inkOn, profile, rankTitle, type Profile } from '../core/profile';
+import { subsolarPoint } from '../core/sun';
 import { LEVELS, levelSpec } from '../game/campaign';
 import type { GameData } from '../game/data';
 import {
@@ -49,6 +50,11 @@ type Page = 'main' | 'libre' | 'echelons' | 'compte';
 
 /** Le globe fait un tour en trois minutes. */
 const SPIN_DEG_PER_S = 2;
+/** Part de terres par tranche de 10° de longitude, de 180° O à 180° E (à la louche, entre 50° S et 65° N). */
+const LAND_BY_LON = [
+  0.03, 0.06, 0.08, 0.08, 0.1, 0.25, 0.4, 0.5, 0.5, 0.45, 0.55, 0.55, 0.45, 0.3, 0.08, 0.03, 0.15, 0.4, 0.6, 0.7, 0.75, 0.75, 0.6, 0.5, 0.5, 0.6, 0.55, 0.55, 0.6, 0.6,
+  0.55, 0.5, 0.4, 0.15, 0.05, 0.05,
+];
 const NO_PADDING = { top: 0, bottom: 0, left: 0, right: 0 };
 
 // ───────────────────────── Petits outils d'affichage ─────────────────────────
@@ -83,6 +89,37 @@ function plural(n: number, one: string, many = `${one}s`): string {
   return `${num(n)} ${n > 1 ? many : one}`;
 }
 
+/** Ramène un écart de longitude entre -180° et 180°. */
+function wrap180(deg: number): number {
+  return ((((deg + 180) % 360) + 360) % 360) - 180;
+}
+
+/**
+ * Longitude où ouvrir le globe : à cheval sur le jour et la nuit, du côté où il
+ * y a le plus de terres à voir (continents éclairés d'un côté, lumières des
+ * villes de l'autre) plutôt qu'un océan.
+ */
+function openingLongitude(sunLon: number): number {
+  let best = sunLon + 60;
+  let bestScore = -1;
+  for (const offset of [-70, -60, -50, 50, 60, 70]) {
+    const centre = sunLon + offset;
+    let score = 0;
+    for (let i = 0; i < LAND_BY_LON.length; i++) {
+      const lon = -175 + i * 10;
+      const fromCentre = Math.abs(wrap180(lon - centre));
+      if (fromCentre > 80) continue;
+      const lit = Math.abs(wrap180(lon - sunLon)) < 90;
+      score += Math.cos((fromCentre * Math.PI) / 180) * LAND_BY_LON[i] * (lit ? 1 : 0.55);
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      best = centre;
+    }
+  }
+  return wrap180(best);
+}
+
 function slotOfMode(mode: GameMode, competition: boolean): SlotId {
   return mode === 'echelons' ? 'echelons' : competition ? 'concurrence' : 'solo';
 }
@@ -115,22 +152,26 @@ export class Home {
     profile.onChange(() => {
       if (this.visible && !this.typingName()) this.render();
     });
+    window.addEventListener('resize', this.onResize);
   }
 
   get visible(): boolean {
     return !this.root.hidden;
   }
 
-  /** Affiche l'accueil (le globe se recadre et se met à tourner). */
-  show(): void {
+  /** Affiche l'accueil (le globe se recadre et se met à tourner). `instant` : sans le mouvement de recadrage (au lancement). */
+  show(instant = false): void {
     this.root.hidden = false;
     document.body.classList.add('home-on');
     this.setPage('main');
     // Un globe nu derrière le menu : les noms de la carte reviennent avec la partie.
     setLabels(this.map, false);
     this.map.stop();
-    this.map.easeTo({ center: [this.map.getCenter().lng, 22], zoom: globeZoom() + 0.32, bearing: 0, pitch: 0, padding: NO_PADDING, duration: 1400 });
-    this.spinAfter = performance.now() + 1500;
+    // Le globe se présente à cheval sur le jour et la nuit.
+    const view = this.globeView(openingLongitude(subsolarPoint(Date.now()).lon));
+    if (instant) this.map.jumpTo(view);
+    else this.map.easeTo({ ...view, duration: 1400 });
+    this.spinAfter = performance.now() + (instant ? 300 : 1500);
     this.startSpin();
   }
 
@@ -149,6 +190,28 @@ export class Home {
   }
 
   // ── Globe ──
+
+  /**
+   * Cadrage du globe. Téléphone tenu droit : le globe entier dans la moitié
+   * haute de l'écran, le titre et le menu dessous. Écran large : le globe en
+   * grand, derrière le menu.
+   */
+  private globeView(lng: number): { center: [number, number]; zoom: number; bearing: number; pitch: number; padding: typeof NO_PADDING } {
+    const tall = window.innerHeight > window.innerWidth * 1.2;
+    this.root.classList.toggle('tall', tall);
+    return {
+      center: [lng, 22],
+      zoom: tall ? globeZoom() - 0.04 : globeZoom() + 0.32,
+      bearing: 0,
+      pitch: 0,
+      padding: tall ? { ...NO_PADDING, bottom: Math.round(window.innerHeight * 0.5) } : NO_PADDING,
+    };
+  }
+
+  /** L'écran a changé de taille ou de sens : le globe se recadre, sans changer de face. */
+  private onResize = (): void => {
+    if (this.visible) this.map.jumpTo(this.globeView(this.map.getCenter().lng));
+  };
 
   private startSpin(): void {
     if (this.spinning) return;
@@ -242,7 +305,7 @@ export class Home {
 
   private modeShort(sum: SlotSummary): string {
     if (sum.slot === 'echelons') return sum.finished ? 'Échelons : tous gravis' : `Échelon ${sum.level ?? 1}`;
-    return sum.slot === 'solo' ? 'Partie libre sans concurrence' : 'Partie libre avec concurrence';
+    return sum.slot === 'solo' ? 'Sans concurrence' : 'Avec concurrence';
   }
 
   // ── Pages ──
