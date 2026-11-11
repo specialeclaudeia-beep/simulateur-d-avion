@@ -1,0 +1,79 @@
+/*
+ * Polices du jeu, embarquées (elles fonctionnent hors connexion) :
+ *   - Barlow : textes ;
+ *   - Barlow Condensed : titres, boutons, onglets ;
+ *   - B612 Mono : horloge et grands chiffres (la police des écrans de cockpit).
+ * Toutes sous licence libre SIL Open Font License (paquets @fontsource).
+ */
+
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../node_modules/@fontsource/barlow/files/barlow-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../node_modules/@fontsource/barlow/files/barlow-latin-500-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../node_modules/@fontsource/barlow/files/barlow-latin-600-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../node_modules/@fontsource/barlow/files/barlow-latin-700-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../node_modules/@fontsource/barlow-condensed/files/barlow-condensed-latin-500-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../node_modules/@fontsource/barlow-condensed/files/barlow-condensed-latin-600-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../node_modules/@fontsource/barlow-condensed/files/barlow-condensed-latin-700-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'B612 Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../node_modules/@fontsource/b612-mono/files/b612-mono-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'B612 Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../node_modules/@fontsource/b612-mono/files/b612-mono-latin-700-normal.woff2') format('woff2');
+}

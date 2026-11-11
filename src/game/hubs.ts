@@ -17,12 +17,13 @@ import type { GameState, Hub } from './state';
 
 export type HubUpgrade = 'gates' | 'lineSlots' | 'parking' | 'quality' | 'maintenance';
 
-export const HUB_UPGRADE_LABEL: Record<HubUpgrade, { title: string; icon: string }> = {
-  gates: { title: 'Portes d’embarquement', icon: '🚪' },
-  lineSlots: { title: 'Licences de lignes', icon: '🗺️' },
-  parking: { title: 'Parking avions', icon: '🅿️' },
-  quality: { title: 'Qualité du terminal', icon: '⭐' },
-  maintenance: { title: 'Atelier de maintenance', icon: '🔧' },
+/** `icon` : nom d'une icône de src/ui/icons.ts. */
+export const HUB_UPGRADE_LABEL: Record<HubUpgrade, { title: string; icon: 'door' | 'license' | 'parking' | 'star' | 'wrench' }> = {
+  gates: { title: 'Portes d’embarquement', icon: 'door' },
+  lineSlots: { title: 'Licences de lignes', icon: 'license' },
+  parking: { title: 'Parking avions', icon: 'parking' },
+  quality: { title: 'Qualité du terminal', icon: 'star' },
+  maintenance: { title: 'Atelier de maintenance', icon: 'wrench' },
 };
 
 /** Prix d'achat d'un hub pour cette compagnie (plus cher hors de son pays). */

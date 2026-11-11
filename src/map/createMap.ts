@@ -49,6 +49,11 @@ export async function createMap(container: HTMLElement): Promise<MapLibreMap> {
   await new Promise<void>((resolve) => map.once('load', () => resolve()));
   applyDetail(map, s.detail);
 
+  // Les crédits de la carte restent à portée (bouton ⓘ) mais repliés : dépliés, ils recouvrent les boutons du jeu.
+  const credits = container.querySelector<HTMLElement>('.maplibregl-ctrl-attrib');
+  credits?.classList.remove('maplibregl-compact-show');
+  credits?.removeAttribute('open');
+
   settings.onChange((next, changed) => {
     if (changed.graphics) map.setPixelRatio(pixelRatioFor(next.graphics));
     if (changed.detail) applyDetail(map, next.detail);

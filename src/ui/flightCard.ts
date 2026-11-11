@@ -2,6 +2,7 @@ import type { GameClock } from '../core/clock';
 import type { AircraftLayer } from '../map/aircraft';
 import type { Flight } from '../flights/types';
 import { LISTEN_POINTS, listenPoint, nextListenPoint } from '../audio/flightSounds';
+import { icon } from './icons';
 
 /**
  * Fiche de l'avion touché : compagnie, numéro de vol, départ → arrivée,
@@ -40,8 +41,8 @@ export function mountFlightCard(root: HTMLElement, layer: AircraftLayer, clock: 
           <small>${esc(f.airlineName)}${f.player ? ' · ta compagnie' : ''}</small>
         </div>
         <button type="button" class="hud-btn fc-cabin" title="Changer d’endroit d’écoute : dehors, cabine, cockpit"></button>
-        <button type="button" class="hud-btn fc-follow" title="La caméra suit l'avion" aria-pressed="false">🎯 Suivre</button>
-        <button type="button" class="hud-btn fc-close" aria-label="Fermer">✕</button>
+        <button type="button" class="hud-btn fc-follow" title="La caméra suit l'avion" aria-label="Suivre l'avion" aria-pressed="false">${icon('target', 18)}<span>Suivre</span></button>
+        <button type="button" class="hud-btn fc-close" aria-label="Fermer">${icon('close', 18)}</button>
       </div>
       <div class="fc-route">
         <div class="fc-ap">
@@ -49,7 +50,7 @@ export function mountFlightCard(root: HTMLElement, layer: AircraftLayer, clock: 
           <small>${esc(from?.city || from?.name || '')}</small>
           <small class="fc-time">${timeFmt.format(f.depMs)} UTC</small>
         </div>
-        <div class="fc-bar"><div class="fc-bar-fill"></div><span class="fc-plane">✈</span></div>
+        <div class="fc-bar"><div class="fc-bar-fill"></div><span class="fc-plane">${icon('plane', 20)}</span></div>
         <div class="fc-ap fc-ap-to">
           <b>${esc(f.to)}</b>
           <small>${esc(to?.city || to?.name || '')}</small>
@@ -94,9 +95,12 @@ export function mountFlightCard(root: HTMLElement, layer: AircraftLayer, clock: 
     const cabin = card.querySelector<HTMLButtonElement>('.fc-cabin');
     if (cabin) {
       const p = LISTEN_POINTS.find((x) => x.id === listenPoint())!;
-      const html = `${p.icon}<span class="fc-cabin-label"> ${p.label}</span>`;
-      if (cabin.innerHTML !== html) cabin.innerHTML = html;
-      cabin.setAttribute('aria-label', `Écoute : ${p.label}`);
+      // Le bouton n'est redessiné que si l'endroit d'écoute change (sinon un clic en cours serait perdu).
+      if (cabin.dataset.point !== p.id) {
+        cabin.dataset.point = p.id;
+        cabin.innerHTML = `${icon(p.icon, 18)}<span class="fc-cabin-label">${p.label}</span>`;
+        cabin.setAttribute('aria-label', `Écoute : ${p.label}`);
+      }
     }
     const follow = card.querySelector<HTMLButtonElement>('.fc-follow');
     if (follow) {

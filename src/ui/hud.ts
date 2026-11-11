@@ -1,13 +1,23 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { SPEEDS, type GameClock, type Speed } from '../core/clock';
 import { START_CENTER, globeZoom } from '../map/createMap';
+import { icon } from './icons';
+
+export interface HudHooks {
+  /** Prévenir la carte d'un saut dans le temps (jour / nuit). */
+  onTimeJump(): void;
+  /** Bouton ☰ : ouvre le menu du jeu. */
+  onMenu(): void;
+}
 
 /**
- * Barre du haut : date et heure du jeu, vitesse du temps, retour au globe.
+ * Barre du haut (pendant une partie) : menu, date et heure du jeu, vitesse du
+ * temps, retour au globe.
  */
-export function mountHud(root: HTMLElement, clock: GameClock, map: MapLibreMap, onTimeJump: () => void): void {
+export function mountHud(root: HTMLElement, clock: GameClock, map: MapLibreMap, hooks: HudHooks): void {
   root.innerHTML = `
     <div class="hud-bar">
+      <button class="hud-btn hud-menu" type="button" title="Menu" aria-label="Menu du jeu">${icon('menu', 20)}</button>
       <div class="hud-time" title="Heure du jeu">
         <span class="hud-clock"><span class="hud-hm"></span><span class="hud-sec"></span></span>
         <span class="hud-sub">
@@ -18,8 +28,8 @@ export function mountHud(root: HTMLElement, clock: GameClock, map: MapLibreMap, 
       </div>
       <div class="hud-speeds" role="group" aria-label="Vitesse du temps"><span class="hud-thumb" aria-hidden="true"></span></div>
       <div class="hud-tools">
-        <button class="hud-btn hud-now" type="button" title="Rattraper l'heure réelle (le jeu est en retard)" hidden>⟳ Maintenant</button>
-        <button class="hud-btn hud-globe" type="button" title="Voir le globe entier" aria-label="Voir le globe entier">🌍</button>
+        <button class="hud-btn hud-now" type="button" title="Rattraper l'heure réelle (le jeu est en retard)" aria-label="Rattraper l'heure réelle" hidden>${icon('now', 18)}<span>Maintenant</span></button>
+        <button class="hud-btn hud-globe" type="button" title="Voir le globe entier" aria-label="Voir le globe entier">${icon('globe', 20)}</button>
       </div>
     </div>
   `;
@@ -30,22 +40,25 @@ export function mountHud(root: HTMLElement, clock: GameClock, map: MapLibreMap, 
     const b = document.createElement('button');
     b.type = 'button';
     b.className = `hud-speed${s === 0 ? ' hud-pause' : ''}`;
-    b.innerHTML = s === 0 ? PAUSE_ICON : s === 1 ? `${PLAY_ICON}<span>×1</span>` : `<span>×${s >= 1000 ? `${s / 1000}k` : s}</span>`;
+    b.innerHTML = s === 0 ? icon('pause', 18) : s === 1 ? `${icon('play', 12)}<span>×1</span>` : `<span>×${s >= 1000 ? `${s / 1000}k` : s}</span>`;
     b.title = s === 0 ? 'Pause' : `Vitesse ×${s}`;
+    b.setAttribute('aria-label', b.title);
     b.addEventListener('click', () => clock.setSpeed(s));
     speedsEl.appendChild(b);
     buttons.set(s, b);
   }
 
+  root.querySelector('.hud-menu')!.addEventListener('click', () => hooks.onMenu());
   const nowBtn = root.querySelector<HTMLButtonElement>('.hud-now')!;
   nowBtn.addEventListener('click', () => {
     clock.resetToRealTime();
-    onTimeJump();
+    hooks.onTimeJump();
   });
   root.querySelector('.hud-globe')!.addEventListener('click', () => {
     map.flyTo({ center: START_CENTER, zoom: globeZoom(), bearing: 0, pitch: 0, duration: 1800 });
   });
 
+  const bar = root.querySelector<HTMLElement>('.hud-bar')!;
   const dateEl = root.querySelector<HTMLSpanElement>('.hud-date')!;
   const dateShortEl = root.querySelector<HTMLSpanElement>('.hud-date-short')!;
   const hmEl = root.querySelector<HTMLSpanElement>('.hud-hm')!;
@@ -62,17 +75,18 @@ export function mountHud(root: HTMLElement, clock: GameClock, map: MapLibreMap, 
       b.classList.toggle('active', s === clock.speed);
       b.setAttribute('aria-pressed', String(s === clock.speed));
     }
-    // Pastille qui glisse sous le bouton actif (orange en pause, bleue sinon).
+    // Pastille qui glisse sous le bouton actif (rouge en pause, ambre sinon, cyan en très rapide).
     const on = buttons.get(clock.speed);
-    if (on) {
+    if (on && on.offsetWidth) {
       thumb.style.transform = `translateX(${on.offsetLeft}px)`;
       thumb.style.width = `${on.offsetWidth}px`;
     }
-    root.querySelector('.hud-bar')!.classList.toggle('paused', clock.paused);
-    root.querySelector('.hud-bar')!.classList.toggle('fast', clock.speed >= 1000);
+    bar.classList.toggle('paused', clock.paused);
+    bar.classList.toggle('fast', clock.speed >= 1000);
   };
   window.addEventListener('resize', refreshSpeed);
-  requestAnimationFrame(refreshSpeed);
+  // La barre est cachée hors partie : la pastille se replace dès qu'elle réapparaît.
+  new ResizeObserver(refreshSpeed).observe(speedsEl);
   clock.onChange(refreshSpeed);
   refreshSpeed();
 
@@ -83,7 +97,7 @@ export function mountHud(root: HTMLElement, clock: GameClock, map: MapLibreMap, 
     requestAnimationFrame(render);
     const now = clock.now();
     const d = new Date(now);
-    const sec = `:${String(d.getSeconds()).padStart(2, '0')}`;
+    const sec = String(d.getSeconds()).padStart(2, '0');
     if (secEl.textContent !== sec) secEl.textContent = sec;
     // « Maintenant » ne sert qu'à rattraper l'heure réelle : jamais à revenir en arrière.
     const behind = clock.behindRealTime;
@@ -91,18 +105,16 @@ export function mountHud(root: HTMLElement, clock: GameClock, map: MapLibreMap, 
     const minute = Math.floor(now / 60_000);
     if (minute === shownMinute) return;
     shownMinute = minute;
-    hmEl.textContent = timeFmt.format(d);
+    // Les deux-points d'une police à chasse fixe laissent un trou : on les resserre (voir .hud-hm i).
+    const [hh, mm] = timeFmt.format(d).split(':');
+    hmEl.innerHTML = `${hh}<i>:</i>${mm}`;
     utcEl.textContent = `${utcFmt.format(d)} UTC`;
-    const date = dateFmt.format(d);
+    // « mer. 11 nov. 2026 » s'affiche en capitales : sans les points d'abréviation.
+    const date = dateFmt.format(d).replace(/\./g, '');
     if (dateEl.textContent !== date) {
       dateEl.textContent = date;
-      dateShortEl.textContent = dateShortFmt.format(d);
+      dateShortEl.textContent = dateShortFmt.format(d).replace(/\./g, '');
     }
   };
   render();
 }
-
-const PAUSE_ICON =
-  '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="6" y="5" width="4.2" height="14" rx="1.4" fill="currentColor"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.4" fill="currentColor"/></svg>';
-const PLAY_ICON =
-  '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z" fill="currentColor"/></svg>';

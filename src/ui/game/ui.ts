@@ -8,10 +8,12 @@
  * partie change, et chaque seconde s'il montre des choses qui bougent.
  */
 import type { Map as MapLibreMap } from 'maplibre-gl';
+import { goalsReached } from '../../game/campaign';
 import type { ActionResult, Ctx } from '../../game/context';
 import type { Game } from '../../game/game';
 import type { AircraftLayer } from '../../map/aircraft';
 import type { NetworkLayer } from '../../map/networkLayer';
+import { icon, type IconName } from '../icons';
 import { esc, money } from './dom';
 import { logoHtml } from './logo';
 
@@ -45,12 +47,12 @@ interface Toast {
   timer: number;
 }
 
-const TABS: { id: Exclude<TabId, 'company'>; icon: string; label: string }[] = [
-  { id: 'hubs', icon: '🏢', label: 'Hubs' },
-  { id: 'fleet', icon: '✈️', label: 'Flotte' },
-  { id: 'pilots', icon: '🧑‍✈️', label: 'Pilotes' },
-  { id: 'lines', icon: '🗺️', label: 'Lignes' },
-  { id: 'finances', icon: '📊', label: 'Finances' },
+const TABS: { id: Exclude<TabId, 'company'>; icon: IconName; label: string }[] = [
+  { id: 'hubs', icon: 'hub', label: 'Hubs' },
+  { id: 'fleet', icon: 'plane', label: 'Flotte' },
+  { id: 'pilots', icon: 'pilot', label: 'Pilotes' },
+  { id: 'lines', icon: 'route', label: 'Lignes' },
+  { id: 'finances', icon: 'chart', label: 'Finances' },
 ];
 
 // ───────────────────────── Interface ─────────────────────────
@@ -76,6 +78,9 @@ export class Ui {
   private cashEl: HTMLElement;
   private logoEl: HTMLElement;
   private logoKey = '';
+  private goalEl: HTMLButtonElement;
+  private goalKey = '';
+  private goalAction: () => void = () => {};
 
   constructor(
     readonly game: Game,
@@ -92,7 +97,7 @@ export class Ui {
       <button type="button" class="g-nav-company" data-tab="company" aria-label="Ma compagnie">
         <span class="g-nav-logo"></span><span class="g-nav-cash"></span>
       </button>
-      ${TABS.map((t) => `<button type="button" class="g-tab" data-tab="${t.id}"><span class="g-tab-icon" aria-hidden="true">${t.icon}</span><small>${t.label}</small><i class="g-dot" hidden></i></button>`).join('')}
+      ${TABS.map((t) => `<button type="button" class="g-tab" data-tab="${t.id}"><span class="g-tab-icon">${icon(t.icon, 22)}</span><small>${t.label}</small><i class="g-dot" hidden></i></button>`).join('')}
     `;
     this.cashEl = this.nav.querySelector('.g-nav-cash')!;
     this.logoEl = this.nav.querySelector('.g-nav-logo')!;
@@ -106,10 +111,10 @@ export class Ui {
     this.sheet.hidden = true;
     this.sheet.innerHTML = `
       <header class="g-sheet-head">
-        <button type="button" class="g-icon-btn g-back" aria-label="Retour">‹</button>
+        <button type="button" class="g-icon-btn g-back" aria-label="Retour">${icon('back', 22)}</button>
         <h2 class="g-sheet-title"></h2>
-        <button type="button" class="g-icon-btn g-expand" aria-label="Agrandir ou réduire">⤢</button>
-        <button type="button" class="g-icon-btn g-close" aria-label="Fermer">✕</button>
+        <button type="button" class="g-icon-btn g-expand" aria-label="Agrandir en plein écran">${icon('expand', 19)}</button>
+        <button type="button" class="g-icon-btn g-close" aria-label="Fermer">${icon('close', 20)}</button>
       </header>
       <div class="g-body"></div>
     `;
@@ -128,12 +133,19 @@ export class Ui {
     this.body.addEventListener('input', (e) => this.onInput(e, false));
     this.body.addEventListener('change', (e) => this.onInput(e, true));
 
+    // Mode par échelons : rappel des objectifs, sous la barre du haut.
+    this.goalEl = document.createElement('button');
+    this.goalEl.type = 'button';
+    this.goalEl.className = 'g-goal';
+    this.goalEl.hidden = true;
+    this.goalEl.addEventListener('click', () => this.goalAction());
+
     this.toastBox = document.createElement('div');
     this.toastBox.className = 'g-toasts';
     this.toastBox.setAttribute('role', 'status');
     this.toastBox.setAttribute('aria-live', 'polite');
 
-    document.body.append(this.sheet, this.nav, this.toastBox);
+    document.body.append(this.sheet, this.nav, this.goalEl, this.toastBox);
 
     game.onChange(() => this.queueRefresh());
     game.onTick(() => this.updateNav());
@@ -173,9 +185,27 @@ export class Ui {
   }
 
   stop(): void {
-    document.body.classList.remove('game-on');
+    document.body.classList.remove('game-on', 'campaign-on');
     this.nav.hidden = true;
+    this.goalEl.hidden = true;
+    this.goalKey = '';
     this.close();
+    this.clearToasts();
+  }
+
+  /** Ce que fait la pastille des objectifs quand on la touche. */
+  setGoalAction(fn: () => void): void {
+    this.goalAction = fn;
+  }
+
+  /** Un panneau est-il ouvert ? */
+  get sheetOpen(): boolean {
+    return !this.sheet.hidden;
+  }
+
+  /** Onglet affiché (ou null si le panneau est fermé). */
+  get currentTab(): TabId | null {
+    return this.sheet.hidden ? null : (this.top?.tab ?? null);
   }
 
   // ── Navigation ──
@@ -193,6 +223,12 @@ export class Ui {
     const root = this.tabs.get(id);
     if (!root) return;
     this.stack = [root()];
+    this.show();
+  }
+
+  /** Ouvre un écran seul (sans passer par un onglet). */
+  open(view: View): void {
+    this.stack = [view];
     this.show();
   }
 
@@ -240,7 +276,7 @@ export class Ui {
     this.sheet.classList.toggle('expanded', on);
     document.body.classList.toggle('sheet-expanded', on);
     const b = this.sheet.querySelector<HTMLButtonElement>('.g-expand')!;
-    b.textContent = on ? '⤡' : '⤢';
+    b.innerHTML = icon(on ? 'collapse' : 'expand', 19);
     b.setAttribute('aria-label', on ? 'Réduire' : 'Agrandir en plein écran');
   }
 
@@ -306,6 +342,25 @@ export class Ui {
       dot.hidden = level === null;
       dot.className = `g-dot ${level ?? ''}`;
     }
+    this.updateGoal();
+  }
+
+  /** Pastille « Échelon 2 ●●○ » : visible en mode par échelons, tant que la campagne n'est pas finie. */
+  private updateGoal(): void {
+    const c = this.game.state.campaign;
+    const on = !!c && !c.finished;
+    if (this.goalEl.hidden === on) {
+      this.goalEl.hidden = !on;
+      document.body.classList.toggle('campaign-on', on);
+    }
+    if (!c || !on) return;
+    const key = `${c.level}:${c.reached.airports}:${c.reached.satisfaction}:${c.reached.profit}:${c.cleared}`;
+    if (key === this.goalKey) return;
+    this.goalKey = key;
+    const dots = (['airports', 'satisfaction', 'profit'] as const).map((g) => `<i class="${c.reached[g] ? 'on' : ''}"></i>`).join('');
+    this.goalEl.classList.toggle('cleared', c.cleared);
+    this.goalEl.innerHTML = `${icon(c.cleared ? 'trophy' : 'stairs', 17)}<span>${c.cleared ? 'Échelon réussi' : `Échelon ${c.level}`}</span><span class="g-goal-dots">${dots}</span>${c.cleared ? icon('chevron', 15) : ''}`;
+    this.goalEl.setAttribute('aria-label', `Échelon ${c.level} : ${goalsReached(c)} objectif(s) atteint(s) sur 3. Voir les objectifs.`);
   }
 
   // ── Actions du joueur ──
@@ -342,6 +397,14 @@ export class Ui {
       window.clearTimeout(old.timer);
       old.el.remove();
     }
+  }
+
+  private clearToasts(): void {
+    for (const t of this.toasts) {
+      window.clearTimeout(t.timer);
+      t.el.remove();
+    }
+    this.toasts = [];
   }
 
   // ── Fenêtres ──

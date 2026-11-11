@@ -5,18 +5,21 @@
  */
 
 :root {
-  --nav-h: 58px;
+  --nav-h: 60px;
   --hud-h: 64px; /* mesurée par le jeu */
-  --g-bg: rgba(9, 15, 33, 0.96);
-  --g-card: rgba(255, 255, 255, 0.05);
-  --g-line: rgba(255, 255, 255, 0.1);
-  --g-fg: #e9eefb;
-  --g-muted: #9fb0d6;
-  --g-accent: #4da3ff;
-  --g-good: #36c47a;
-  --g-warn: #f5c542;
-  --g-bad: #ff6b6b;
-  --g-work: #b388ff;
+  --g-bg: rgba(7, 11, 20, 0.96);
+  --g-card: rgba(255, 255, 255, 0.045);
+  --g-line: var(--line);
+  --g-fg: var(--fg);
+  --g-muted: var(--muted);
+  --g-accent: var(--amber);
+  /* Texte posé sur la couleur d'accent. */
+  --g-accent-ink: var(--amber-ink);
+  --g-info: var(--cyan);
+  --g-good: var(--good);
+  --g-warn: var(--warn);
+  --g-bad: var(--bad);
+  --g-work: var(--work);
   /* Graphique bénéfice / perte (paire bleu / rouge validée sur fond sombre). */
   --g-chart-pos: #3987e5;
   --g-chart-neg: #e66767;
@@ -75,7 +78,7 @@
 }
 
 .g-nav-cash.neg {
-  color: #ff8a8a;
+  color: #ff8f8f;
 }
 
 .g-tab {
@@ -119,7 +122,7 @@
   height: 9px;
   border-radius: 50%;
   background: var(--g-warn);
-  box-shadow: 0 0 0 2px #0b1226;
+  box-shadow: 0 0 0 2px var(--ink-1);
 }
 
 .g-dot.bad {
@@ -227,7 +230,7 @@
   border: 1px solid transparent;
   border-radius: 12px;
   background: var(--g-accent);
-  color: #04122a;
+  color: var(--g-accent-ink);
   font: inherit;
   font-size: 15px;
   font-weight: 700;
@@ -248,9 +251,9 @@
 }
 
 .g-btn.ghost.danger {
-  background: rgba(255, 107, 107, 0.08);
-  border-color: rgba(255, 107, 107, 0.35);
-  color: #ff8a8a;
+  background: rgba(255, 93, 93, 0.08);
+  border-color: rgba(255, 93, 93, 0.35);
+  color: #ff8f8f;
 }
 
 .g-btn.small {
@@ -329,7 +332,7 @@
 
 .g-row.on {
   border-color: var(--g-accent);
-  background: rgba(77, 163, 255, 0.12);
+  background: rgba(255, 182, 39, 0.12);
 }
 
 .g-row-icon {
@@ -417,7 +420,7 @@
 }
 
 .g-card.g-listing.good {
-  border-color: rgba(54, 196, 122, 0.55);
+  border-color: rgba(61, 220, 151, 0.55);
 }
 
 .g-title-line {
@@ -493,24 +496,24 @@
   padding: 10px 12px;
   border-left: 3px solid var(--g-accent);
   border-radius: 10px;
-  background: rgba(77, 163, 255, 0.1);
+  background: rgba(255, 182, 39, 0.1);
   font-size: 13.5px;
   line-height: 1.4;
 }
 
 .g-note.warn {
   border-color: var(--g-warn);
-  background: rgba(245, 197, 66, 0.1);
+  background: rgba(255, 209, 102, 0.1);
 }
 
 .g-note.bad {
   border-color: var(--g-bad);
-  background: rgba(255, 107, 107, 0.12);
+  background: rgba(255, 93, 93, 0.12);
 }
 
 .g-note.good {
   border-color: var(--g-good);
-  background: rgba(54, 196, 122, 0.12);
+  background: rgba(61, 220, 151, 0.12);
 }
 
 .g-empty {
@@ -534,28 +537,28 @@
 }
 
 .g-badge.fly {
-  background: rgba(77, 163, 255, 0.2);
-  color: #9cccff;
+  background: rgba(92, 200, 255, 0.16);
+  color: #8fd8ff;
 }
 
 .g-badge.ok {
-  background: rgba(54, 196, 122, 0.18);
-  color: #7fe0aa;
+  background: rgba(61, 220, 151, 0.18);
+  color: #7fe8bb;
 }
 
 .g-badge.warn {
-  background: rgba(245, 197, 66, 0.18);
-  color: #f7d679;
+  background: rgba(255, 209, 102, 0.18);
+  color: #ffdf8f;
 }
 
 .g-badge.bad {
-  background: rgba(255, 107, 107, 0.2);
-  color: #ff9a9a;
+  background: rgba(255, 93, 93, 0.2);
+  color: #ff9c9c;
 }
 
 .g-badge.work {
-  background: rgba(179, 136, 255, 0.2);
-  color: #d0b6ff;
+  background: rgba(183, 156, 255, 0.2);
+  color: #d3c2ff;
 }
 
 .g-badge.mute {
@@ -602,11 +605,11 @@
 }
 
 .pos {
-  color: #5fd38d;
+  color: var(--g-good);
 }
 
 .neg {
-  color: #ff7b7b;
+  color: #ff7a7a;
 }
 
 .g-flag {
@@ -672,7 +675,7 @@ img.g-logo {
 }
 
 select.g-input option {
-  background: #0e1630;
+  background: var(--ink-3);
 }
 
 /* Code d'une partie à coller : long texte, petit, sur plusieurs lignes. */
@@ -726,7 +729,7 @@ select.g-input option {
 .g-chip.on {
   border-color: var(--g-accent);
   background: var(--g-accent);
-  color: #04122a;
+  color: var(--g-accent-ink);
   font-weight: 700;
 }
 
@@ -831,8 +834,8 @@ select.g-input option {
 }
 
 .g-guide {
-  border-color: rgba(77, 163, 255, 0.5);
-  background: rgba(77, 163, 255, 0.08);
+  border-color: rgba(255, 182, 39, 0.5);
+  background: rgba(255, 182, 39, 0.08);
 }
 
 .g-guide ol {
@@ -1041,7 +1044,7 @@ select.g-input option {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: #0d1530;
+  background: var(--ink-2);
   font-size: 12px;
   text-align: center;
 }
@@ -1139,8 +1142,8 @@ select.g-input option {
 }
 
 @media (max-width: 899px) {
-  .g-wizard[data-step='1'],
-  .g-wizard[data-step='3'] {
+  .g-wizard[data-step='country'],
+  .g-wizard[data-step='hub'] {
     height: min(52vh, calc(100dvh - var(--hud-h) - 8px));
   }
 }
@@ -1192,7 +1195,7 @@ select.g-input option {
 
 .g-steps li.on span {
   background: var(--g-accent);
-  color: #04122a;
+  color: var(--g-accent-ink);
 }
 
 .g-steps li.done span {
@@ -1301,7 +1304,7 @@ select.g-input option {
 
 .g-symbol.on {
   border-color: var(--g-accent);
-  background: rgba(77, 163, 255, 0.15);
+  background: rgba(255, 182, 39, 0.15);
 }
 
 .g-logo-colors {
@@ -1365,7 +1368,7 @@ select.g-input option {
 
 .g-option.on {
   border-color: var(--g-accent);
-  background: rgba(77, 163, 255, 0.14);
+  background: rgba(255, 182, 39, 0.14);
 }
 
 /* ───────────── Notifications et fenêtres ───────────── */
@@ -1391,7 +1394,7 @@ select.g-input option {
   border: 1px solid var(--g-line);
   border-left: 4px solid var(--g-accent);
   border-radius: 12px;
-  background: rgba(9, 15, 33, 0.96);
+  background: var(--ink-2);
   box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
   color: var(--g-fg);
   font-size: 14px;
@@ -1446,7 +1449,7 @@ select.g-input option {
   padding: 18px;
   border: 1px solid var(--g-line);
   border-radius: 16px;
-  background: #0e1630;
+  background: var(--ink-3);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
   color: var(--g-fg);
 }
@@ -1624,42 +1627,95 @@ body.wizard-on .country-card {
   min-height: 2.9em;
 }
 
-/* ═════════════════════════ Refonte visuelle (menus, personnes) ═════════════════════════ */
+/* ═════════════════════════ Thème « vol de nuit » ═════════════════════════
+ * Titres, onglets et boutons en Barlow Condensed ; accent ambre ; icônes au
+ * trait. Ces règles viennent après les règles de mise en page ci-dessus.
+ */
 
-/* Barre du bas : onglet actif en pastille lumineuse. */
+/* ── Barre du bas ── */
+
 .g-nav {
-  background: linear-gradient(180deg, rgba(16, 25, 52, 0.97), rgba(7, 12, 28, 0.98));
+  background: linear-gradient(180deg, rgba(13, 21, 36, 0.97), rgba(5, 8, 15, 0.985));
+  border-top: 1px solid var(--line-strong);
+}
+
+.g-nav-company {
+  gap: 7px;
+  padding: 0 10px 0 8px;
+}
+
+.g-nav-cash {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  letter-spacing: -0.03em;
 }
 
 .g-tab {
+  gap: 2px;
   border-top: 0 !important;
+  transition: color 0.2s;
+}
+
+/* Trait ambre au-dessus de l'onglet ouvert. */
+.g-tab::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: var(--amber);
+  transition:
+    width 0.2s,
+    margin 0.2s;
+}
+
+.g-tab.active::before {
+  width: 30px;
+  margin-left: -15px;
 }
 
 .g-tab-icon {
   display: grid;
   place-items: center;
   width: 46px;
-  height: 28px;
+  height: 27px;
   border-radius: 14px;
   transition:
     background 0.2s,
     transform 0.2s;
 }
 
+.g-tab small {
+  font-family: var(--font-title);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.g-tab.active,
+.g-tab.active small {
+  color: var(--amber);
+}
+
 .g-tab.active .g-tab-icon {
-  background: linear-gradient(180deg, rgba(107, 182, 255, 0.35), rgba(47, 134, 232, 0.25));
-  box-shadow: inset 0 0 0 1px rgba(107, 182, 255, 0.45);
+  background: rgba(255, 182, 39, 0.13);
+  box-shadow: inset 0 0 0 1px rgba(255, 182, 39, 0.38);
   transform: translateY(-1px);
 }
 
-.g-tab.active small {
-  color: #9fd0ff;
-  font-weight: 700;
+.g-dot {
+  top: 6px;
+  left: calc(50% + 9px);
 }
 
-/* Feuille : en-tête dégradé, titre plus marqué. */
+/* ── Feuille des écrans ── */
+
 .g-sheet {
-  background: linear-gradient(180deg, rgba(14, 22, 46, 0.98), rgba(8, 13, 30, 0.98));
+  background: linear-gradient(180deg, rgba(13, 21, 36, 0.98), rgba(6, 10, 18, 0.985));
+  border-color: var(--line-strong);
   transition:
     height 0.28s cubic-bezier(0.3, 1, 0.4, 1),
     top 0.28s,
@@ -1667,25 +1723,31 @@ body.wizard-on .country-card {
 }
 
 .g-sheet-head {
-  background: linear-gradient(180deg, rgba(77, 163, 255, 0.1), transparent);
+  background: linear-gradient(180deg, rgba(255, 182, 39, 0.07), transparent);
   border-radius: 18px 18px 0 0;
 }
 
 .g-sheet-title {
-  font-size: 18px;
-  letter-spacing: 0.01em;
+  font-family: var(--font-title);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .g-icon-btn {
+  display: grid;
+  place-items: center;
   border: 1px solid transparent;
+  color: var(--muted);
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .g-icon-btn:hover {
   background: rgba(255, 255, 255, 0.07);
-}
-
-.g-expand {
-  font-size: 19px;
+  color: var(--fg);
 }
 
 /* Agrandir = vraiment plein écran (par-dessus l'horloge), seule la barre du bas reste. */
@@ -1694,6 +1756,7 @@ body.wizard-on .country-card {
   height: auto;
   border-radius: 0;
   z-index: 35;
+  background: var(--ink-1);
 }
 
 .g-sheet.expanded .g-sheet-head {
@@ -1705,32 +1768,88 @@ body.wizard-on .country-card {
   padding-right: max(14px, calc((100% - 760px) / 2));
 }
 
-/* Sections : titre avec un trait de couleur. */
+/* ── Boutons ── */
+
+.g-btn {
+  border-radius: 11px;
+  font-family: var(--font-title);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition:
+    transform 0.1s,
+    filter 0.15s,
+    background 0.15s;
+}
+
+.g-btn:not(.ghost):not(.danger) {
+  background: linear-gradient(180deg, var(--amber-soft), var(--amber));
+  box-shadow:
+    0 3px 14px rgba(255, 182, 39, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.g-btn:not(:disabled):hover {
+  filter: brightness(1.08);
+}
+
+.g-btn.ghost {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--line-strong);
+}
+
+.g-btn.small {
+  min-height: 38px;
+  font-size: 15.5px;
+}
+
+.g-btn:disabled {
+  box-shadow: none !important;
+  filter: saturate(0.4);
+}
+
+.g-btn .ic {
+  margin: -3px 0;
+}
+
+/* ── Sections, cartes, lignes ── */
+
 .g-h3 {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #b9c8ea;
+  color: var(--muted);
+  font-family: var(--font-title);
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
 }
 
 .g-h3::before {
   content: '';
   flex: none;
-  width: 4px;
-  height: 14px;
-  border-radius: 2px;
-  background: var(--g-accent);
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--amber);
+}
+
+.g-card .g-h3 {
+  font-family: var(--font-title);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .g-card .g-h3::before {
   display: none;
 }
 
-/* Cartes et lignes : léger relief. */
 .g-card,
-.g-row {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.03));
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+.g-row,
+.g-upgrade {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.022));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .g-row {
@@ -1739,20 +1858,187 @@ body.wizard-on .country-card {
     background 0.15s;
 }
 
-.g-row:hover {
-  border-color: rgba(107, 182, 255, 0.4);
+.g-row:not(.static):hover {
+  border-color: rgba(255, 182, 39, 0.4);
 }
 
-.g-row:active {
-  background: rgba(77, 163, 255, 0.12);
+.g-row:not(.static):active {
+  background: rgba(255, 182, 39, 0.1);
 }
 
-.g-btn:not(.ghost):not(.danger) {
-  background: linear-gradient(180deg, #6bb6ff, #3a8ef0);
-  box-shadow: 0 3px 12px rgba(58, 142, 240, 0.35);
+.g-row-icon,
+.g-upgrade-icon {
+  display: grid;
+  place-items: center;
+  color: var(--cyan);
 }
 
-/* Personnes : pastille à initiales + drapeau. */
+.g-row-icon.warn {
+  color: var(--warn);
+}
+
+.g-row-icon.mute {
+  color: var(--muted);
+}
+
+.g-row-chev {
+  display: grid;
+  place-items: center;
+  font-size: 0;
+}
+
+.g-title-line {
+  font-size: 16px;
+}
+
+.g-title-line > .ic:first-child {
+  margin-right: 4px;
+  color: var(--cyan);
+}
+
+.g-price,
+.g-option-money {
+  font-family: var(--font-mono);
+  letter-spacing: -0.03em;
+}
+
+.g-price {
+  font-size: 20px;
+}
+
+.g-option strong {
+  font-family: var(--font-title);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.g-chip {
+  font-family: var(--font-title);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.g-chips-sm .g-chip {
+  font-size: 14.5px;
+}
+
+.g-chip .ic {
+  margin-right: 5px;
+}
+
+.g-badge {
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.g-rank {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--fg);
+}
+
+.g-steps span {
+  font-family: var(--font-mono);
+}
+
+.g-steps small {
+  font-family: var(--font-title);
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.g-note {
+  border-left-width: 3px;
+}
+
+.g-note:not(.warn):not(.bad):not(.good) {
+  border-color: var(--cyan);
+  background: rgba(92, 200, 255, 0.08);
+}
+
+/* Journal : une icône de couleur par type d'événement. */
+.g-log-icon {
+  display: grid;
+  place-items: start center;
+  padding-top: 1px;
+  color: var(--muted);
+}
+
+.g-log li.good .g-log-icon {
+  color: var(--good);
+}
+
+.g-log li.bad .g-log-icon {
+  color: var(--bad);
+}
+
+.g-log li.money .g-log-icon {
+  color: var(--amber);
+}
+
+/* ── Fenêtres et messages ── */
+
+.g-modal-back {
+  background: rgba(2, 4, 8, 0.66);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: g-fade 0.18s ease-out;
+}
+
+.g-modal {
+  border-color: var(--line-strong);
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--ink-3), var(--ink-2));
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  animation: g-pop 0.2s cubic-bezier(0.3, 1.3, 0.5, 1);
+}
+
+.g-modal h2 {
+  font-family: var(--font-title);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+@keyframes g-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes g-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+}
+
+.g-toast {
+  border-color: var(--line-strong);
+  border-left: 4px solid var(--cyan);
+  background: linear-gradient(180deg, var(--ink-3), var(--ink-2));
+}
+
+.g-toast.money {
+  border-left-color: var(--amber);
+}
+
+.g-loading {
+  border: 1px solid var(--line-strong);
+  font-family: var(--font-title);
+  font-size: 16px;
+  letter-spacing: 0.03em;
+}
+
+/* ── Personnes : pastille à initiales + drapeau ── */
+
 .g-row-icon:has(.g-avatar) {
   width: auto;
 }
@@ -1765,7 +2051,7 @@ body.wizard-on .country-card {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: linear-gradient(145deg, hsl(var(--h) 65% 58%), hsl(calc(var(--h) + 40) 60% 38%));
+  background: linear-gradient(145deg, hsl(var(--h) 62% 56%), hsl(calc(var(--h) + 40) 58% 36%));
   box-shadow:
     0 0 0 2px rgba(255, 255, 255, 0.12),
     0 3px 8px rgba(0, 0, 0, 0.35);
@@ -1774,9 +2060,10 @@ body.wizard-on .country-card {
 
 .g-avatar b {
   color: #fff;
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 0.03em;
+  font-family: var(--font-title);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
@@ -1796,7 +2083,7 @@ body.wizard-on .country-card {
 }
 
 .g-avatar.l b {
-  font-size: 19px;
+  font-size: 22px;
 }
 
 .g-avatar.l i {
@@ -1809,9 +2096,51 @@ body.wizard-on .country-card {
   gap: 10px;
 }
 
+/* ── Verrous du mode par échelons ── */
+
+.g-locked {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+
+.g-locked .ic {
+  margin-top: 1px;
+  color: var(--amber);
+}
+
+.g-quota {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.g-quota.full {
+  border-color: rgba(255, 182, 39, 0.5);
+  color: var(--amber);
+}
+
+.g-quota .ic {
+  color: var(--muted);
+}
+
 @media (min-width: 900px) {
   .g-expand {
-    display: inline-block !important;
+    display: grid !important;
   }
 
   .g-sheet.expanded {
@@ -1823,8 +2152,4 @@ body.wizard-on .country-card {
     height: auto;
     border-radius: 16px;
   }
-}
-
-.g-sheet.expanded {
-  background: #0a1128;
 }

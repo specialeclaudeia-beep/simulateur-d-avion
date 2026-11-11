@@ -22,10 +22,11 @@ import { music } from './music';
 // ── Où l'on écoute ──
 
 export type ListenPoint = 'dehors' | 'cabine' | 'cockpit';
-export const LISTEN_POINTS: { id: ListenPoint; icon: string; label: string }[] = [
-  { id: 'dehors', icon: '🎧', label: 'Dehors' },
-  { id: 'cabine', icon: '💺', label: 'Cabine' },
-  { id: 'cockpit', icon: '👨‍✈️', label: 'Cockpit' },
+/** `icon` : nom d'une icône de src/ui/icons.ts. */
+export const LISTEN_POINTS: { id: ListenPoint; icon: 'headphones' | 'cabin' | 'cockpit'; label: string }[] = [
+  { id: 'dehors', icon: 'headphones', label: 'Dehors' },
+  { id: 'cabine', icon: 'cabin', label: 'Cabine' },
+  { id: 'cockpit', icon: 'cockpit', label: 'Cockpit' },
 ];
 
 let listen: ListenPoint = 'dehors';

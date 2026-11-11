@@ -4,6 +4,7 @@
  */
 import { flagEmoji } from '../../map/countries';
 import { money } from '../../game/ledger';
+import { icon, type IconName } from '../icons';
 
 export { money, flagEmoji };
 
@@ -108,7 +109,7 @@ export function row(opts: { action: string; id?: string; icon?: string; title: s
     ${opts.icon ? `<span class="g-row-icon">${opts.icon}</span>` : ''}
     <span class="g-row-main"><span class="g-row-title">${opts.title}</span>${opts.sub ? `<span class="g-row-sub">${opts.sub}</span>` : ''}</span>
     ${opts.right ? `<span class="g-row-right">${opts.right}</span>` : ''}
-    <span class="g-row-chev" aria-hidden="true">›</span>
+    <span class="g-row-chev">${icon('chevron', 16)}</span>
   </button>`;
 }
 
@@ -139,4 +140,19 @@ export function empty(text: string, action = ''): string {
 
 export function note(text: string, tone: 'info' | 'warn' | 'bad' | 'good' = 'info'): string {
   return `<p class="g-note ${tone}">${text}</p>`;
+}
+
+/** Libellé précédé d'une icône (boutons, puces). */
+export function withIcon(name: IconName, label: string, size = 18): string {
+  return `${icon(name, size)}<span>${label}</span>`;
+}
+
+/** Ce qui n'est pas encore débloqué (mode par échelons). */
+export function locked(text: string): string {
+  return `<p class="g-locked">${icon('lock', 18)}<span>${text}</span></p>`;
+}
+
+/** Compteur « 2 / 4 » avec son icône (limites du mode par échelons). */
+export function quota(name: IconName, used: number, max: number, label: string): string {
+  return `<span class="g-quota${used >= max ? ' full' : ''}" title="${esc(label)}">${icon(name, 14)}${used}\u202f/\u202f${max}</span>`;
 }

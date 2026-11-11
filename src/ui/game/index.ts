@@ -4,6 +4,7 @@
  * joueur, ses avions sur le calque des avions) et les notifications.
  */
 import './game.css';
+import '../screens.css';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import type { GameClock } from '../../core/clock';
 import { loadGameData, type GameData } from '../../game/data';
@@ -34,14 +35,20 @@ export interface GameDeps {
   onTimeJump: () => void;
 }
 
-export async function mountGame(deps: GameDeps): Promise<Game | null> {
+export interface GameApp {
+  game: Game;
+  /** Ouvre le menu du jeu (bouton ☰ de la barre du haut). */
+  openMenu(): void;
+}
+
+export async function mountGame(deps: GameDeps): Promise<GameApp> {
   const data = await loadWithRetry();
   const game = new Game(data, deps.clock, deps.onTimeJump);
   const ui = new Ui(game, deps);
   let bankruptShown = false;
 
   // ── Onglets ──
-  ui.registerTab('company', () => companyView(ui, { newGame: restart, loaded: afterLoad }));
+  ui.registerTab('company', () => companyView(ui, { newGame: restart, loaded: afterLoad, settings: () => {}, home: () => {}, goals: () => {} }));
   ui.registerTab('hubs', () => hubsView(ui));
   ui.registerTab('fleet', () => fleetView(ui), () => fleetBadge(ui));
   ui.registerTab('pilots', () => pilotsView(ui), () => pilotsBadge(ui));
@@ -100,7 +107,10 @@ export async function mountGame(deps: GameDeps): Promise<Game | null> {
       map: deps.map,
       countries: deps.countries,
       network: deps.network,
+      mode: 'libre',
+      competition: true,
       notice,
+      onCancel: () => startWizard(),
       onDone(params) {
         game.newGame(params);
         play();
@@ -159,7 +169,7 @@ export async function mountGame(deps: GameDeps): Promise<Game | null> {
 
   // Accès pratique depuis la console du navigateur pour tester.
   Object.assign(window, { game });
-  return game;
+  return { game, openMenu: () => ui.openTab('company') };
 }
 
 // ───────────────────────── Chargement ─────────────────────────
