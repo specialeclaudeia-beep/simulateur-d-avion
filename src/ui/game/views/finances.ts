@@ -7,7 +7,7 @@ import { BANKRUPTCY_DAYS, DAY, DOMESTIC_VAT_MAX, DOMESTIC_VAT_SHARE, FUEL_PRICE_
 import { INVEST_KEYS, LEDGER_LABEL, OPEX_KEYS, REVENUE_KEYS, dailySeries, monthLabel, summarize, type DayPoint } from '../../../game/ledger';
 import type { MonthLedger } from '../../../game/state';
 import type { IconName } from '../../icons';
-import { btn, compact, esc, kv, money, note, num, num1, section, signedMoneyHtml, withIcon } from '../dom';
+import { btn, compact, esc, kv, money, note, num, num1, plural, section, signedMoneyHtml, withIcon } from '../dom';
 import { barChart, pieChart } from './charts';
 import type { Ui, View } from '../ui';
 
@@ -147,7 +147,7 @@ export function financesView(ui: Ui): View {
       let alert = '';
       if (s.cash < 0 && s.negativeSince !== null) {
         const left = Math.max(0, BANKRUPTCY_DAYS - Math.floor((now - s.negativeSince) / DAY));
-        alert = note(`Trésorerie négative : faillite dans ${left} jour(s) si elle ne redevient pas positive. Emprunte ou vends un avion.`, 'bad');
+        alert = note(`Trésorerie négative : faillite dans ${plural(left, 'jour')} si elle ne redevient pas positive. Emprunte ou vends un avion.`, 'bad');
       }
 
       const fuelVsNormal = s.fuelPrice / FUEL_PRICE_START - 1;

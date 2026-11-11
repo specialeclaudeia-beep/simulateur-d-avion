@@ -14,7 +14,7 @@ import type { Game } from '../../game/game';
 import type { AircraftLayer } from '../../map/aircraft';
 import type { NetworkLayer } from '../../map/networkLayer';
 import { icon, type IconName } from '../icons';
-import { esc, money } from './dom';
+import { esc, money, plural } from './dom';
 import { logoHtml } from './logo';
 
 // ───────────────────────── Types ─────────────────────────
@@ -360,7 +360,7 @@ export class Ui {
     const dots = (['airports', 'satisfaction', 'profit'] as const).map((g) => `<i class="${c.reached[g] ? 'on' : ''}"></i>`).join('');
     this.goalEl.classList.toggle('cleared', c.cleared);
     this.goalEl.innerHTML = `${icon(c.cleared ? 'trophy' : 'stairs', 17)}<span>${c.cleared ? 'Échelon réussi' : `Échelon ${c.level}`}</span><span class="g-goal-dots">${dots}</span>${c.cleared ? icon('chevron', 15) : ''}`;
-    this.goalEl.setAttribute('aria-label', `Échelon ${c.level} : ${goalsReached(c)} objectif(s) atteint(s) sur 3. Voir les objectifs.`);
+    this.goalEl.setAttribute('aria-label', `Échelon ${c.level} : ${plural(goalsReached(c), 'objectif atteint', 'objectifs atteints')} sur 3. Voir les objectifs.`);
   }
 
   // ── Actions du joueur ──

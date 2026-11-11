@@ -11,7 +11,7 @@ import { orderQuote } from '../../../game/fleet';
 import { maintenanceQuote, repairQuote } from '../../../game/sim';
 import type { Aircraft } from '../../../game/state';
 import { icon } from '../../icons';
-import { avatar, badge, bar, btn, dateLong, empty, esc, flagEmoji, kv, locked, money, note, num, pct, quota, row, section, signedMoneyHtml, stars, when, withIcon } from '../dom';
+import { avatar, badge, bar, btn, dateLong, empty, esc, flagEmoji, kv, locked, money, note, num, pct, plural, quota, row, section, signedMoneyHtml, stars, when, withIcon } from '../dom';
 import type { Ui, View } from '../ui';
 import { aircraftName, cityOf, pilotFullName, place, statusOf } from './common';
 import { openLineView } from './lines';
@@ -96,7 +96,7 @@ export function fleetView(ui: Ui): View {
           });
         })
         .join('');
-      return `${actions}<p class="g-small">${lim ? `${quota('plane', s.aircraft.length, lim.fleet, 'Avions autorisés à cet échelon')} ` : `${s.aircraft.length} avion(s) · `}${flying} en vol</p><div class="g-list">${rows}</div>`;
+      return `${actions}<p class="g-small">${lim ? `${quota('plane', s.aircraft.length, lim.fleet, 'Avions autorisés à cet échelon')} ` : `${plural(s.aircraft.length, 'avion')} · `}${flying} en vol</p><div class="g-list">${rows}</div>`;
     },
     action(a, el) {
       if (a === 'buyNew') ui.push(buyNewView(ui));
@@ -337,7 +337,7 @@ function linePickView(ui: Ui, acId: string): View {
                 id: l.id,
                 icon: icon('route', 22),
                 title: `${place(d, l.hub)} ⇄ ${place(d, l.dest)}`,
-                sub: `${num(l.km)} km · ${served ? `${served} avion(s) déjà dessus` : 'aucun avion pour l’instant'}`,
+                sub: `${num(l.km)} km · ${served ? `${plural(served, 'avion')} déjà dessus` : 'aucun avion pour l’instant'}`,
               });
         })
         .join('');
@@ -408,7 +408,7 @@ export function buyNewView(ui: Ui): View {
             id: mf.id,
             icon: `<span class="g-flag">${flagEmoji(mf.country)}</span>`,
             title: esc(mf.name),
-            sub: `${models.length} modèle(s) · remise ${Math.round(lo * 100)} à ${Math.round(hi * 100)}\u202f% selon la quantité${bought ? ` · ${bought} déjà acheté(s)` : ''}`,
+            sub: `${plural(models.length, 'modèle')} · remise ${Math.round(lo * 100)} à ${Math.round(hi * 100)}\u202f% selon la quantité${bought ? ` · ${bought} déjà ${bought > 1 ? 'achetés' : 'acheté'}` : ''}`,
           });
         })
         .join('');
@@ -480,7 +480,7 @@ function modelView(ui: Ui, modelId: string): View {
       else if (lim && s.aircraft.length + qty > lim.fleet) {
         problems.push(`Flotte limitée à ${lim.fleet} avions à cet échelon (tu en as ${s.aircraft.length}). L’amélioration « ${PERKS.fleet.title} » ou l’échelon suivant en autorisent plus.`);
       }
-      if (left < qty) problems.push(`Parking de ${esc(cityOf(d, base))} : ${left} place(s) libre(s). Agrandis-le dans l’onglet Hubs.`);
+      if (left < qty) problems.push(`Parking de ${esc(cityOf(d, base))} : ${left ? plural(left, 'place libre', 'places libres') : 'aucune place libre'}. Agrandis-le dans l’onglet Hubs.`);
       if (q.total > s.cash) problems.push(`Il te manque ${money(q.total - s.cash)}.`);
       return `
         <div class="g-card">

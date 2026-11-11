@@ -28,7 +28,7 @@ import { CATEGORY_LABEL, TIER_LABEL, type Airport } from '../../../game/data';
 import { pilotName } from '../../../game/pilots';
 import type { GoalId, PerkId } from '../../../game/state';
 import { icon, perkIcon, type IconName } from '../../icons';
-import { bar, btn, compact, empty, esc, flagEmoji, fold, kv, money, note, num, row, section, withIcon } from '../dom';
+import { bar, btn, compact, empty, esc, flagEmoji, fold, kv, money, note, num, plural, row, section, withIcon } from '../dom';
 import { mapPadding, type Ui, type View } from '../ui';
 
 export interface CampaignHooks {
@@ -300,7 +300,7 @@ function countryView(ui: Ui, hooks: CampaignHooks, perks: PerkId[]): View {
             id: x.code,
             icon: `<span class="g-flag">${flagEmoji(x.code)}</span>`,
             title: esc(x.name),
-            sub: `${num(hubsFor(d, x.code, level).length)} hub(s) possibles · impôt ${num(d.corporateTax(x.code))} %`,
+            sub: `${plural(hubsFor(d, x.code, level).length, 'hub possible', 'hubs possibles')} · impôt ${num(d.corporateTax(x.code))} %`,
             right: `${compact(x.pax)} pass./an`,
           }),
         )

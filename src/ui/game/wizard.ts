@@ -19,7 +19,7 @@ import type { Countries } from '../../map/countries';
 import { globeZoom } from '../../map/createMap';
 import type { NetworkLayer } from '../../map/networkLayer';
 import { icon } from '../icons';
-import { compact, esc, flagEmoji, fold, kv, money, note, num, num1, withIcon } from './dom';
+import { compact, esc, flagEmoji, fold, kv, money, note, num, num1, plural, withIcon } from './dom';
 import { LOGO_SHAPES, LOGO_SYMBOLS, PALETTE, imageToLogo, logoHtml } from './logo';
 import { mapPadding } from './ui';
 
@@ -196,7 +196,7 @@ export function runWizard(deps: WizardDeps): WizardHandle {
     return `<button type="button" class="g-row${c.code === st.country ? ' on' : ''}" data-w="country" data-v="${c.code}">
       <span class="g-row-icon g-flag">${flagEmoji(c.code)}</span>
       <span class="g-row-main"><span class="g-row-title">${esc(c.name)}</span>
-        <span class="g-row-sub">${campaign ? `${num(hubsFor(data, c.code, 1).length)} hub(s) de départ` : `${num(data.airportsOfCountry(c.code).length)} aéroports`} · impôt ${tax === null ? '?' : num1(tax)}\u202f%</span></span>
+        <span class="g-row-sub">${campaign ? `${plural(hubsFor(data, c.code, 1).length, 'hub')} de départ` : `${num(data.airportsOfCountry(c.code).length)} aéroports`} · impôt ${tax === null ? '?' : num1(tax)}\u202f%</span></span>
       <span class="g-row-right">${compact(c.pax)} pass./an</span>
     </button>`;
   }
@@ -229,7 +229,7 @@ export function runWizard(deps: WizardDeps): WizardHandle {
       <p class="g-lead">${campaign ? 'Dans quel pays commencer ? Il fixe tes impôts et tes premiers aéroports.' : 'Où installer le siège ? Le pays fixe tes impôts et la liste des hubs possibles.'} <b>Touche un pays sur le globe</b> ou cherche-le.</p>
       ${details}
       <input class="g-input" type="search" data-w="countrySearch" placeholder="Rechercher un pays…" value="${esc(st.countrySearch)}">
-      <p class="g-small">${q ? `${list.length} résultat(s)` : 'Classés par trafic aérien'}</p>
+      <p class="g-small">${q ? `${plural(list.length, 'résultat')}` : 'Classés par trafic aérien'}</p>
       <div class="g-list">${list.map(countryRow).join('')}</div>
     `;
   }
@@ -282,7 +282,7 @@ export function runWizard(deps: WizardDeps): WizardHandle {
             ['Passagers par an', num(a.pax)],
             campaign ? ['Lignes intérieures possibles', num(home)] : ['Destinations réelles', num(routes)],
             ...(campaign ? ([['Premier objectif', `relier ${levelGoals(data, 1, a.iata).airports} aéroports du pays`]] as [string, string][]) : []),
-            ['Pour commencer', `${Math.min(HUB_START.gates[a.tier], Math.max(1, a.gates))} porte(s), ${Math.min(HUB_START.lineSlots[a.tier], routes)} licences de lignes, ${HUB_START.parking[a.tier]} places de parking`],
+            ['Pour commencer', `${plural(Math.min(HUB_START.gates[a.tier], Math.max(1, a.gates)), 'porte')}, ${plural(Math.min(HUB_START.lineSlots[a.tier], routes), 'licence')} de lignes, ${plural(HUB_START.parking[a.tier], 'place')} de parking`],
           ])}
         </div>`;
     }

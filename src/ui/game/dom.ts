@@ -36,6 +36,11 @@ export function num1(n: number): string {
   return nf1.format(n);
 }
 
+/** Le nombre et son nom accordé : « 1 avion », « 3 avions » (en français, 0 et 1 sont au singulier). */
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return `${num(n)} ${Math.abs(n) >= 2 ? many : one}`;
+}
+
 /** 1 234 567 → « 1,2 M », 45 000 → « 45 k ». */
 export function compact(n: number): string {
   const a = Math.abs(n);

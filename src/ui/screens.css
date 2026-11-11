@@ -43,6 +43,11 @@
   justify-content: flex-end;
 }
 
+/* Pages de l'accueil (partie libre, échelons, compte) : le globe s'efface derrière le texte. */
+.home:not([data-page='main']) {
+  background: rgba(3, 6, 11, 0.76);
+}
+
 @keyframes home-in {
   from {
     opacity: 0;
@@ -1807,5 +1812,47 @@ body.home-on .maplibregl-ctrl-bottom-right {
 
   .home-btn-text strong {
     font-size: 21px;
+  }
+}
+
+/* Téléphone couché : le titre à gauche, les trois boutons à droite. */
+@media (max-height: 480px) and (min-width: 560px) {
+  .home-center {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    grid-template-rows: auto auto;
+    align-content: center;
+    column-gap: 26px;
+    row-gap: 10px;
+    max-width: 720px;
+    overflow: visible;
+  }
+
+  .home-title {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: end;
+    margin: 0;
+  }
+
+  .home-title span {
+    font-size: 40px;
+  }
+
+  .home-resume {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: start;
+  }
+
+  .home-menu {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    gap: 8px;
+  }
+
+  .home-btn {
+    min-height: 58px;
   }
 }

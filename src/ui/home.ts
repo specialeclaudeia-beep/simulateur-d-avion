@@ -28,9 +28,9 @@ import {
 } from '../game/save';
 import type { GameMode } from '../game/state';
 import { setLabels } from '../map/baseStyle';
-import { globeZoom } from '../map/createMap';
+import { globeZoom, globeZoomFor } from '../map/createMap';
 import { canInstall, install, isInstalled } from '../pwa';
-import { compact, esc, flagEmoji, money, num } from './game/dom';
+import { compact, esc, flagEmoji, money, num, plural } from './game/dom';
 import { logoHtml } from './game/logo';
 import { copyText, downloadText, readImport } from './game/saves';
 import type { Ui } from './game/ui';
@@ -83,10 +83,6 @@ function playTime(ms: number): string {
   if (min < 1) return '< 1 min';
   if (min < 60) return `${min} min`;
   return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}`;
-}
-
-function plural(n: number, one: string, many = `${one}s`): string {
-  return `${num(n)} ${n > 1 ? many : one}`;
 }
 
 /** Ramène un écart de longitude entre -180° et 180°. */
@@ -197,14 +193,17 @@ export class Home {
    * grand, derrière le menu.
    */
   private globeView(lng: number): { center: [number, number]; zoom: number; bearing: number; pitch: number; padding: typeof NO_PADDING } {
-    const tall = window.innerHeight > window.innerWidth * 1.2;
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const tall = H > W * 1.2;
     this.root.classList.toggle('tall', tall);
     return {
       center: [lng, 22],
-      zoom: tall ? globeZoom() - 0.04 : globeZoom() + 0.32,
+      // Écran haut : le globe tient dans la moitié du haut, sans toucher les bords.
+      zoom: tall ? globeZoomFor(Math.min(0.84 * W, 0.44 * H)) : globeZoom() + 0.32,
       bearing: 0,
       pitch: 0,
-      padding: tall ? { ...NO_PADDING, bottom: Math.round(window.innerHeight * 0.5) } : NO_PADDING,
+      padding: tall ? { ...NO_PADDING, bottom: Math.round(H * 0.5) } : NO_PADDING,
     };
   }
 
@@ -437,7 +436,7 @@ export class Home {
       ? trophies
           .map((d) => {
             const country = this.data.country(d.country)?.name ?? d.country;
-            return `<span class="trophy">${icon('trophy', 20)}<span>Échelon ${d.level} · ${esc(levelSpec(d.level).name)}<small>${flagEmoji(d.country)} ${esc(country)} · ${plural(d.days, 'jour')} · ${d.goals} objectif${d.goals > 1 ? 's' : ''} sur 3</small></span></span>`;
+            return `<span class="trophy">${icon('trophy', 20)}<span>Échelon ${d.level} · ${esc(levelSpec(d.level).name)}<small>${flagEmoji(d.country)} ${esc(country)} · ${plural(d.days, 'jour')} · ${plural(d.goals, 'objectif')} sur 3</small></span></span>`;
           })
           .join('')
       : `<span class="trophy empty">${icon('trophy', 20)}<span>Réussis un échelon pour gagner ton premier trophée.</span></span>`;

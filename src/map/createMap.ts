@@ -8,10 +8,14 @@ import { addBaseImages, applyDetail, baseStyle } from './baseStyle';
 /** Vue de départ : le globe entier, centré sur l'Europe / l'Afrique. */
 export const START_CENTER: [number, number] = [10, 30];
 
+/** Zoom pour que le globe ait ce diamètre à l'écran, en pixels. */
+export function globeZoomFor(diameterPx: number): number {
+  return Math.max(0.6, Math.log2(diameterPx / 420) + 1.4);
+}
+
 /** Zoom pour que le globe occupe ~85 % du plus petit côté de l'écran (téléphone ou ordinateur). */
 export function globeZoom(): number {
-  const minSide = Math.min(window.innerWidth, window.innerHeight);
-  return Math.max(0.6, Math.log2((0.85 * minSide) / 420) + 1.4);
+  return globeZoomFor(0.85 * Math.min(window.innerWidth, window.innerHeight));
 }
 
 // MapLibre décode les tuiles dans un « worker » : on lui indique le fichier

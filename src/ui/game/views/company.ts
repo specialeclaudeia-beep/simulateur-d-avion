@@ -118,7 +118,7 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
         )}
         ${section(
           'Classement mondial',
-          `<p>Avec <b>${s.lines.length}</b> ligne(s), ta compagnie serait <b>${num(r.rank)}<sup>e</sup></b> sur ${num(r.total)} compagnies réelles${r.neighbour ? `, juste derrière ${esc(r.neighbour)}` : ' : la première du monde !'}.</p>`,
+          `<p>Avec <b>${s.lines.length}</b> ${s.lines.length > 1 ? 'lignes' : 'ligne'}, ta compagnie serait <b>${num(r.rank)}<sup>e</sup></b> sur ${num(r.total)} compagnies réelles${r.neighbour ? `, juste derrière ${esc(r.neighbour)}` : ' : la première du monde !'}.</p>`,
         )}
         ${section(
           'Réglages de la partie',

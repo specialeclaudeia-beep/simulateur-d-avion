@@ -171,7 +171,8 @@ export function orderAircraft(ctx: Ctx, t: number, modelId: string, qty: number,
   const locked = modelProblem(s, model) ?? fleetProblem(ctx, qty);
   if (locked) return fail(locked);
   if (!findHub(ctx, base)) return fail('Choisis un de tes hubs pour la livraison.');
-  if (parkingLeft(ctx, base) < qty) return fail(`Pas assez de place au parking de ${city(ctx, base)} (${parkingLeft(ctx, base)} place(s) libre(s)).`);
+  const free = parkingLeft(ctx, base);
+  if (free < qty) return fail(`Pas assez de place au parking de ${city(ctx, base)} (${free > 1 ? `${free} places libres` : free === 1 ? '1 place libre' : 'aucune place libre'}).`);
   const q = orderQuote(data, s, model, qty, t);
   const no = cantAfford(ctx, q.total);
   if (no) return no;

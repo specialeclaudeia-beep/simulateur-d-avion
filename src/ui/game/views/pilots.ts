@@ -9,7 +9,7 @@ import { pilotProblem } from '../../../game/economy';
 import { familyMinStars, initialTraining, typeRatingSpec } from '../../../game/pilots';
 import type { Pilot } from '../../../game/state';
 import { icon } from '../../icons';
-import { avatar, badge, btn, dateLong, empty, esc, kv, locked, money, note, num, num1, row, section, stars, when, withIcon } from '../dom';
+import { avatar, badge, btn, dateLong, empty, esc, kv, locked, money, note, num, num1, plural, row, section, stars, when, withIcon } from '../dom';
 import type { Ui, View } from '../ui';
 import { aircraftName, pilotFullName } from './common';
 import { aircraftView } from './fleet';
@@ -78,7 +78,7 @@ export function pilotsView(ui: Ui): View {
           }),
         )
         .join('');
-      return `${actions}<p class="g-small">${s.pilots.length} pilote(s) · salaires ${money(payroll)} par mois</p><div class="g-list">${rows}</div>`;
+      return `${actions}<p class="g-small">${plural(s.pilots.length, 'pilote')} · salaires ${money(payroll)} par mois</p><div class="g-list">${rows}</div>`;
     },
     action(a, el) {
       if (a === 'hire') ui.push(hireView(ui));

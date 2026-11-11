@@ -30,7 +30,7 @@ import type { IconName } from '../icons';
 import { mountKeyboard, type Screen } from '../keyboard';
 import { closeMenu, menuOpen, openMenu, type MenuItem } from '../menu';
 import { closeSettings, openSettings } from '../settingsScreen';
-import { esc, money, num } from './dom';
+import { esc, money, plural } from './dom';
 import { logoHtml } from './logo';
 import { modeLabel } from './saves';
 import { Ui, type View } from './ui';
@@ -350,7 +350,7 @@ export async function mountGame(deps: GameDeps): Promise<GameApp> {
       const c = s.campaign;
       items.push(
         item('stairs', c.finished ? 'Mon parcours' : 'Objectifs de l’échelon', openGoals, {
-          sub: c.finished ? 'Campagne terminée' : `Échelon ${c.level} · ${goalsReached(c)} objectif(s) atteint(s) sur 3`,
+          sub: c.finished ? 'Campagne terminée' : `Échelon ${c.level} · ${plural(goalsReached(c), 'objectif atteint', 'objectifs atteints')} sur 3`,
         }),
       );
     }
@@ -479,9 +479,9 @@ function notify(ui: Ui, game: Game, entries: LogEntry[], openGoals: () => void):
 
 function showAway(ui: Ui, s: AwaySummary): void {
   const lines = [
-    `<li>${num(s.flights)} vol(s) effectué(s)</li>`,
+    `<li>${s.flights ? plural(s.flights, 'vol effectué', 'vols effectués') : 'Aucun vol effectué'}</li>`,
     `<li>Trésorerie : <b class="${s.cash < 0 ? 'neg' : 'pos'}">${s.cash >= 0 ? '+' : ''}${esc(money(s.cash))}</b></li>`,
   ];
-  if (s.breakdowns) lines.push(`<li class="neg">${s.breakdowns} panne(s) : regarde ta flotte</li>`);
-  void ui.alert(`Pendant ton absence (${awayLabel(s.gameMs)})`, `<ul class="g-away">${lines.join('')}</ul>`, 'Continuer');
+  if (s.breakdowns) lines.push(`<li class="neg">${plural(s.breakdowns, 'panne')} : regarde ta flotte</li>`);
+  void ui.alert('Pendant ton absence', `<p>Ton absence a duré ${esc(awayLabel(s.gameMs))}. Ta compagnie a continué de tourner :</p><ul class="g-away">${lines.join('')}</ul>`, 'Continuer');
 }

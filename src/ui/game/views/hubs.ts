@@ -10,7 +10,7 @@ import { TIER_LABEL, type Airport } from '../../../game/data';
 import { HUB_UPGRADE_LABEL, hubPrice, hubResale, upgradeInfo, type HubUpgrade } from '../../../game/hubs';
 import { basedAircraft, hubDepartures } from '../../../game/schedule';
 import { icon } from '../../icons';
-import { bar, btn, compact, empty, esc, flagEmoji, fold, kv, locked, money, note, num, quota, row, section, stars, withIcon } from '../dom';
+import { bar, btn, compact, empty, esc, flagEmoji, fold, kv, locked, money, note, num, plural, quota, row, section, stars, withIcon } from '../dom';
 import type { Ui, View } from '../ui';
 import { aircraftName, cityOf, place } from './common';
 import { aircraftView, buyNewView } from './fleet';
@@ -152,7 +152,7 @@ export function hubView(ui: Ui, iata: string): View {
           <p class="g-title-line"><b>${esc(a.name)}</b> <small>${a.iata}</small></p>
           <p class="g-small">${TIER_LABEL[a.tier]} · n° ${a.rank} mondial · ${compact(a.pax)} passagers par an · ${d.routesFrom(iata).length} destinations réelles</p>
           ${kv([
-            ['Départs par jour', `${bar(dep.capacity ? 1 - dep.used / dep.capacity : 0, 'auto')} ${Math.ceil(dep.used)} / ${dep.capacity} <small>(${h.gates} porte(s) × ${DEPARTURES_PER_GATE})</small>`],
+            ['Départs par jour', `${bar(dep.capacity ? 1 - dep.used / dep.capacity : 0, 'auto')} ${Math.ceil(dep.used)} / ${dep.capacity} <small>(${plural(h.gates, 'porte')} × ${DEPARTURES_PER_GATE})</small>`],
             ['Lignes', `${lines.length} / ${h.lineSlots} licences`],
             ['Avions basés', `${based.length} / ${h.parking} places`],
           ])}

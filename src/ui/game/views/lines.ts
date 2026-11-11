@@ -12,7 +12,7 @@ import { domesticVatRate, playerPaxPerDay, referenceFare, routeProblem } from '.
 import { lineFrequency } from '../../../game/schedule';
 import { emptyStats, type Line } from '../../../game/state';
 import { icon } from '../../icons';
-import { badge, btn, dateLong, empty, esc, flagEmoji, fold, kv, locked, money, note, num, pct, quota, row, section, signedMoneyHtml, withIcon } from '../dom';
+import { badge, btn, dateLong, empty, esc, flagEmoji, fold, kv, locked, money, note, num, pct, plural, quota, row, section, signedMoneyHtml, withIcon } from '../dom';
 import type { Ui, View } from '../ui';
 import { aircraftName, cityOf, place } from './common';
 import { aircraftView, buyNewView } from './fleet';
@@ -49,14 +49,14 @@ function competitors(ui: Ui, r: Route, max = 4): string {
   const names = present
     .slice(0, max)
     .map((x) => `${esc(x.name)}${x.status === 'war' ? ` ${badge('guerre des prix', 'bad')}` : x.status === 'new' ? ` ${badge('nouvelle', 'warn')}` : ''}`);
-  return names.join(', ') + (present.length > max ? ` et ${present.length - max} autre(s)` : '');
+  return names.join(', ') + (present.length > max ? ` et ${plural(present.length - max, 'autre')}` : '');
 }
 
 /** Nombre de concurrents sur une ligne, en quelques mots (liste des destinations). */
 function rivalCount(ui: Ui, r: Route): string {
   if (!ui.game.state.competition) return 'sans concurrence';
   const n = presentRivals(ui.game.state, r).length;
-  return n ? `${n} concurrent(s)` : 'aucun concurrent';
+  return n ? plural(n, 'concurrent') : 'aucun concurrent';
 }
 
 /** Mode par échelons : toutes les lignes autorisées sont-elles ouvertes ? */
@@ -96,13 +96,13 @@ export function linesView(ui: Ui): View {
             icon: served ? icon('takeoff', 22) : icon('pauseCircle', 22, 'warn'),
             title: lineTitle(ui, l),
             sub: served
-              ? `${served} avion(s) · ${perDay.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} vol(s)/jour · ce mois : ${m.flights ? `remplissage ${pct(load)}, marge ${signedMoneyHtml(m.revenue - m.costs)}` : 'pas encore de vol'}`
+              ? `${plural(served, 'avion')} · ${perDay.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} ${perDay >= 2 ? 'vols' : 'vol'}/jour · ce mois : ${m.flights ? `remplissage ${pct(load)}, marge ${signedMoneyHtml(m.revenue - m.costs)}` : 'pas encore de vol'}`
               : `${badge('Sans avion', 'warn')} ${num(l.km)} km`,
             right: `${Math.round(l.priceFactor * 100)}\u202f%`,
           });
         })
         .join('');
-      return `${top}<p class="g-small">${lim ? quota('route', s.lines.length, lim.lines, 'Lignes autorisées à cet échelon') : `${s.lines.length} ligne(s).`} À droite : prix du billet par rapport au prix habituel.</p><div class="g-list">${rows}</div>`;
+      return `${top}<p class="g-small">${lim ? quota('route', s.lines.length, lim.lines, 'Lignes autorisées à cet échelon') : `${plural(s.lines.length, 'ligne')}.`} À droite : prix du billet par rapport au prix habituel.</p><div class="g-list">${rows}</div>`;
     },
     action(a, el) {
       if (a === 'open') ui.push(openLineView(ui, ui.game.state.hubs[0].iata));
@@ -359,7 +359,7 @@ export function lineView(ui: Ui, id: string): View {
           `Avions sur la ligne (${served.length})`,
           (served.length
             ? `<div class="g-list">${served.map((a) => row({ action: 'aircraft', id: a.id, icon: icon('plane', 22), title: esc(aircraftName(a)), sub: esc(d.model(a.modelId).name) })).join('')}</div>
-               <p class="g-small">≈ ${legs.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} vol(s) par jour dans chaque sens.</p>`
+               <p class="g-small">≈ ${legs.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} ${legs >= 2 ? 'vols' : 'vol'} par jour dans chaque sens.</p>`
             : note('Aucun avion : la ligne ne rapporte rien.', 'warn')) + btn(withIcon('plus', 'Affecter un avion'), 'assign', { cls: served.length ? 'ghost' : '' }),
         )}
         ${rivalry}
@@ -434,7 +434,7 @@ function assignAircraftView(ui: Ui, lineId: string): View {
                 id: ac.id,
                 icon: icon('plane', 22),
                 title: `${esc(aircraftName(ac))} <small>${esc(m.name)}</small>`,
-                sub: others ? `Dessert déjà ${others} ligne(s) : il alternera` : 'Libre',
+                sub: others ? `Dessert déjà ${plural(others, 'ligne')} : il alternera` : 'Libre',
               });
         })
         .join('');
