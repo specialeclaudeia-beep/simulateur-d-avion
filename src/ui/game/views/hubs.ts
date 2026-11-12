@@ -179,8 +179,8 @@ export function hubView(ui: Ui, iata: string): View {
       if (!h) return;
       switch (a) {
         case 'map':
+          ui.revealMap();
           ui.flyTo(iata, 9);
-          if (window.innerWidth < 900) ui.close();
           return;
         case 'up':
           ui.act(act.upgradeHub, iata, el.dataset.id as HubUpgrade);

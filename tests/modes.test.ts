@@ -2,6 +2,7 @@
  * Tests des modes de jeu : partie libre avec ou sans concurrence, mode par
  * échelons, emplacements de sauvegarde et reprise des anciennes parties.
  */
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import * as act from '../src/game/actions';
 import {
@@ -24,7 +25,7 @@ import {
 import { nextLevel, restartLevel } from '../src/game/campaignFlow';
 import { dailyCompetition, demandContext, presentRivals, rivalList, rivalsOn, warOn } from '../src/game/competition';
 import { DAY, HOUR, TRAINING_DAYS } from '../src/game/config';
-import type { Ctx } from '../src/game/context';
+import { makeCtx, type Ctx } from '../src/game/context';
 import { marketShare, playerPaxPerDay } from '../src/game/economy';
 import { upgradeInfo } from '../src/game/hubs';
 import { initialTraining } from '../src/game/pilots';
@@ -71,6 +72,33 @@ describe('sauvegardes et modes', () => {
     // Et elle se joue comme avant.
     expect(s.hubs[0].iata).toBe('NCE');
     expect(s.cash).toBe(ctx.state.cash);
+  });
+
+  it('une vraie partie de la version 1 du jeu se reprend et continue à tourner', () => {
+    // Partie créée avec la version en ligne d'avant les modes de jeu, telle que le navigateur l'a enregistrée.
+    const text = readFileSync(new URL('./fixtures/partie-version-1.json', import.meta.url), 'utf8');
+    expect((JSON.parse(text) as { version: number }).version).toBe(1);
+    const res = parseSave(text);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    const s = res.save.state;
+    expect(s.version).toBe(SAVE_VERSION);
+    expect(slotOf(s)).toBe('concurrence');
+    expect(s.company.name).toBe('Air Breizh');
+    const before = { flights: s.stats.flights, aircraft: s.aircraft.length, lines: s.lines.length, pilots: s.pilots.length };
+    expect(before.aircraft).toBe(1);
+    expect(before.lines).toBe(2);
+    // Un mois de jeu : les vols continuent, rien n'est perdu, aucun chiffre aberrant.
+    const ctx = makeCtx(realData(), s);
+    advance(ctx, s.time + 30 * DAY);
+    expect(s.stats.flights).toBeGreaterThan(before.flights);
+    expect(Number.isFinite(s.cash)).toBe(true);
+    expect(s.aircraft.length).toBe(before.aircraft);
+    expect(s.lines.length).toBe(before.lines);
+    expect(s.pilots.length).toBe(before.pilots);
+    // Et elle se réenregistre au format actuel.
+    const again = parseSave(serialize(s));
+    expect(again.ok && again.save.state).toEqual(s);
   });
 
   it('range chaque partie dans l’emplacement de son mode', () => {

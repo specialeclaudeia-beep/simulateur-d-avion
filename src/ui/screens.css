@@ -1667,16 +1667,13 @@ body.sheet-expanded .g-goal {
   vertical-align: 0;
 }
 
-/* Compteur d'images par seconde : visible sur tous les écrans. */
-.fps-counter {
-  z-index: 39;
-}
-
+/* Compteur d'images par seconde : à l'accueil, en bas à gauche, par-dessus la page. */
 body.home-on .fps-counter {
   top: auto;
   right: auto;
   bottom: max(8px, env(safe-area-inset-bottom));
   left: 8px;
+  z-index: 39;
 }
 
 body.home-on .g-toasts {

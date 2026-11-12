@@ -33,7 +33,7 @@ import { closeSettings, openSettings } from '../settingsScreen';
 import { esc, money, plural } from './dom';
 import { logoHtml } from './logo';
 import { modeLabel } from './saves';
-import { Ui, type View } from './ui';
+import { Ui, sidePanel, type View } from './ui';
 import { campaignView, levelIntro, type CampaignHooks } from './views/campaign';
 import { companyView } from './views/company';
 import { aircraftView, fleetBadge, fleetView } from './views/fleet';
@@ -92,10 +92,16 @@ export async function mountGame(deps: GameDeps): Promise<GameApp> {
 
   // ── Carte ──
   deps.aircraft.addProvider(playerFlights);
+  // L'avion choisi sur la carte (le même vol est annoncé plusieurs fois : suivi, mise à jour…).
+  let shownFlight: string | null = null;
   deps.aircraft.onSelect((f) => {
-    if (!f?.player || !f.ref) return;
-    // Sur téléphone le panneau cacherait la fiche du vol : on le ferme.
-    if (window.innerWidth < 900) ui.close();
+    const id = f?.id ?? null;
+    if (id === shownFlight) return;
+    shownFlight = id;
+    if (!f) return;
+    // Sur téléphone, le panneau cacherait la fiche de l'avion touché : on le ferme.
+    if (ui.sheetOpen && window.innerWidth < 900) ui.close();
+    if (!f.player || !f.ref) return;
     const ref = f.ref;
     ui.toast(`${f.callsign} · ${f.from} → ${f.to}`, 'info', {
       label: 'Fiche de l’avion',
@@ -105,6 +111,10 @@ export async function mountGame(deps: GameDeps): Promise<GameApp> {
         ui.push(aircraftView(ui, ref));
       },
     });
+  });
+  // Même chose pour la fiche d'un pays, quand le panneau occupe le bas de l'écran.
+  deps.countries.onSelect((c) => {
+    if (c && ui.sheetOpen && !sidePanel()) ui.close();
   });
   deps.network.onHubClick((iata) => {
     if (!game.started) return;

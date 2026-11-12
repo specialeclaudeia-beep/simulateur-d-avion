@@ -1602,6 +1602,12 @@ body.wizard-on .country-card {
   body.wizard-on .g-toasts {
     left: calc((100% - 444px) / 2);
   }
+
+  /* Le compteur d'images par seconde reste sur la carte, à gauche du panneau. */
+  body.sheet-open .fps-counter,
+  body.wizard-on .fps-counter {
+    right: 444px;
+  }
 }
 
 /* Volume de la musique (Ma compagnie) */
@@ -2153,5 +2159,143 @@ body.wizard-on .country-card {
     width: auto;
     height: auto;
     border-radius: 16px;
+  }
+}
+
+/* ───────────── Téléphone couché ─────────────
+ * Le panneau passe à droite, sous la barre du temps : la carte reste visible
+ * à gauche. Même règle que sidePanel() dans ui.ts.
+ */
+
+@media (max-width: 899px) and (min-width: 600px) and (orientation: landscape) {
+  :root {
+    --side-w: min(440px, 56vw);
+  }
+
+  .g-sheet {
+    left: auto;
+    right: 0;
+    top: calc(var(--hud-h) + 6px);
+    width: var(--side-w);
+    height: auto;
+    padding-right: env(safe-area-inset-right);
+    border-right: 0;
+    border-radius: 16px 0 0 0;
+  }
+
+  .g-sheet.expanded {
+    left: 0;
+    width: auto;
+    height: auto;
+    padding-left: env(safe-area-inset-left);
+    border-left: 0;
+  }
+
+  .g-wizard,
+  .g-wizard[data-step='country'],
+  .g-wizard[data-step='hub'] {
+    top: max(6px, env(safe-area-inset-top));
+    height: auto;
+  }
+
+  /* Création de la compagnie : un en-tête et un pied plus bas, pour garder de la place au milieu. */
+  .g-wizard .g-sheet-head {
+    gap: 2px;
+    padding: 6px 12px 5px;
+  }
+
+  .g-steps li {
+    flex-direction: row;
+    justify-content: center;
+    gap: 5px;
+  }
+
+  .g-wizard-foot {
+    padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+  }
+
+  .g-wizard-foot [data-nav='back'] {
+    flex: 0 0 auto;
+  }
+
+  .g-sheet-head {
+    padding-top: 4px;
+    border-radius: 16px 0 0 0;
+  }
+
+  /* Pas de poignée : le panneau ne se tire pas vers le haut. */
+  .g-sheet-head::before {
+    display: none;
+  }
+
+  /* Les messages, la fiche d'un pays et le compteur restent du côté de la carte. */
+  body.sheet-open:not(.sheet-expanded) .g-toasts,
+  body.wizard-on .g-toasts {
+    left: calc((100% - var(--side-w)) / 2);
+    width: min(440px, calc(100% - var(--side-w) - 16px));
+  }
+
+  body.sheet-open .country-card {
+    left: calc((100% - var(--side-w)) / 2);
+    max-width: calc(100% - var(--side-w) - 24px);
+  }
+
+  body.sheet-open .fps-counter,
+  body.wizard-on .fps-counter {
+    right: calc(var(--side-w) + 8px);
+  }
+
+  /* La fiche d'un avion, plus serrée, à droite : l'avion suivi reste visible au milieu de l'écran. */
+  .flight-card,
+  body.game-on .flight-card {
+    left: auto;
+    right: max(8px, env(safe-area-inset-right));
+    bottom: calc(var(--nav-h) + 6px + env(safe-area-inset-bottom));
+    width: min(340px, 44vw);
+    padding: 8px 10px;
+    transform: none;
+    font-size: 13px;
+  }
+
+  body:not(.game-on) .flight-card {
+    bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+
+  .fc-head {
+    gap: 6px;
+    padding-bottom: 6px;
+  }
+
+  .fc-logo,
+  .fc-dot {
+    width: 32px;
+    height: 32px;
+  }
+
+  .fc-cabin-label,
+  .fc-follow span {
+    display: none;
+  }
+
+  .fc-route {
+    margin: 6px 0 4px;
+  }
+
+  .fc-ap b {
+    font-size: 20px;
+  }
+
+  .fc-grid {
+    gap: 1px 12px;
+  }
+
+  .fc-load {
+    margin-top: 5px;
+  }
+
+  /* Les messages laissent la place à la fiche de l'avion. */
+  body:has(.flight-card:not([hidden])) .g-toasts {
+    left: calc((100% - min(340px, 44vw) - 8px) / 2);
+    width: min(440px, calc(100% - min(340px, 44vw) - 24px));
   }
 }

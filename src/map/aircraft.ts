@@ -1,4 +1,4 @@
-import { LngLat, type GeoJSONSource, type Map as MapLibreMap, type MapMouseEvent } from 'maplibre-gl';
+import { LngLat, type GeoJSONSource, type Map as MapLibreMap, type MapMouseEvent, type PaddingOptions } from 'maplibre-gl';
 import type { Feature, Point } from 'geojson';
 import type { GameClock } from '../core/clock';
 import { settings } from '../core/settings';
@@ -55,6 +55,8 @@ export class AircraftLayer {
   private listeners = new Set<Listener>();
   private selection: Selection | null = null;
   private following = false;
+  /** Marges de la carte pendant le suivi : l'avion reste visible à côté de sa fiche. */
+  private followPadding: (() => PaddingOptions) | null = null;
   private visible = true;
   /** Dernier lot de vols fournis (pour retrouver un vol touché). */
   private provided = new Map<string, Flight>();
@@ -186,10 +188,16 @@ export class AircraftLayer {
       const f = this.selectedFlight();
       if (f) {
         const pos = this.positionOf(f, this.clock.now());
-        if (pos) this.map.easeTo({ center: pos.lonLat, zoom: Math.max(this.map.getZoom(), 6), duration: 900 });
+        const padding = this.followPadding?.();
+        if (pos) this.map.easeTo({ center: pos.lonLat, zoom: Math.max(this.map.getZoom(), 6), duration: 900, ...(padding ? { padding } : {}) });
       }
     }
     this.emit();
+  }
+
+  /** Dit quelle partie de l'écran reste libre pendant le suivi (la fiche du vol en cache une partie). */
+  setFollowPadding(fn: () => PaddingOptions): void {
+    this.followPadding = fn;
   }
 
   /** Vol sélectionné, avec ses informations à jour. */

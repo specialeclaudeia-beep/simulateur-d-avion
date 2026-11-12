@@ -692,6 +692,10 @@ body:not(.game-on) #hud {
   font-variant-numeric: tabular-nums;
 }
 
+.fc-reg {
+  white-space: nowrap;
+}
+
 .fc-load {
   margin-top: 8px;
   height: 5px;

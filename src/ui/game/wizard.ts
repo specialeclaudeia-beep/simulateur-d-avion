@@ -21,7 +21,7 @@ import type { NetworkLayer } from '../../map/networkLayer';
 import { icon } from '../icons';
 import { compact, esc, flagEmoji, fold, kv, money, note, num, num1, plural, withIcon } from './dom';
 import { LOGO_SHAPES, LOGO_SYMBOLS, PALETTE, imageToLogo, logoHtml } from './logo';
-import { mapPadding } from './ui';
+import { mapPadding, sidePanel } from './ui';
 
 export interface WizardDeps {
   data: GameData;
@@ -535,6 +535,8 @@ export function runWizard(deps: WizardDeps): WizardHandle {
   }
 
   render();
+  // Panneau sur le côté (ordinateur, téléphone couché) : le globe se place dans la partie de l'écran restée libre.
+  if (sidePanel()) showGlobe();
   return {
     // À la première étape, comme le bouton ✕ : un nom déjà écrit demande une confirmation.
     back: () => (st.step === 0 ? cancelBtn.click() : goBack()),

@@ -15,6 +15,18 @@ export function mountFlightCard(root: HTMLElement, layer: AircraftLayer, clock: 
   card.hidden = true;
   root.appendChild(card);
 
+  // Pendant le suivi, l'avion se place au milieu de la carte que la fiche laisse voir :
+  // au-dessus d'elle (téléphone tenu droit, ordinateur) ou à sa gauche (téléphone couché).
+  layer.setFollowPadding(() => {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const top = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hud-h')) || 0;
+    const r = card.getBoundingClientRect();
+    if (card.hidden || !r.width) return { top, bottom: 0, left: 0, right: 0 };
+    const beside = r.left > W * 0.4 && r.height > (H - top) * 0.55;
+    return beside ? { top, bottom: H - r.bottom, left: 0, right: W - r.left } : { top, bottom: H - r.top, left: 0, right: 0 };
+  });
+
   let current: Flight | null = null;
   const timeFmt = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
   const nf = new Intl.NumberFormat('fr-FR');
@@ -32,6 +44,9 @@ export function mountFlightCard(root: HTMLElement, layer: AircraftLayer, clock: 
         ? `<span class="fc-k">Cargo</span><span class="fc-v">${nf.format(f.cargoT ?? 0)} t / ${nf.format(f.cargoMaxT)} t</span>`
         : `<span class="fc-k">Passagers</span><span class="fc-v">${nf.format(f.pax ?? 0)} / ${nf.format(f.seats ?? 0)} places</span>`;
     const ratio = f.cargoMaxT ? (f.cargoT ?? 0) / f.cargoMaxT : f.seats ? (f.pax ?? 0) / f.seats : 0;
+    // Avec une immatriculation (avions du joueur), le modèle seul : la ligne reste courte.
+    const modelName = model?.name ?? f.aircraftId;
+    const planeName = mfr && !f.registration ? `${mfr.name} ${modelName}` : modelName;
 
     card.innerHTML = `
       <div class="fc-head" style="--airline:${f.color}">
@@ -58,7 +73,7 @@ export function mountFlightCard(root: HTMLElement, layer: AircraftLayer, clock: 
         </div>
       </div>
       <div class="fc-grid">
-        <span class="fc-k">Avion</span><span class="fc-v">${esc(mfr ? `${mfr.name} ${model?.name}` : (model?.name ?? f.aircraftId))}${f.registration ? ` · ${esc(f.registration)}` : ''}</span>
+        <span class="fc-k">Avion</span><span class="fc-v">${esc(planeName)}${f.registration ? ` · <span class="fc-reg">${esc(f.registration)}</span>` : ''}</span>
         ${load}
         <span class="fc-k">Altitude</span><span class="fc-v fc-alt"></span>
         <span class="fc-k">Vitesse</span><span class="fc-v fc-speed"></span>

@@ -271,6 +271,17 @@ export class Ui {
     this.updateTabs();
   }
 
+  /**
+   * Dégage la carte pour y montrer quelque chose : le panneau en plein écran
+   * reprend sa taille, et celui qui occupe le bas de l'écran (téléphone tenu
+   * droit) se ferme.
+   */
+  revealMap(): void {
+    if (this.sheet.hidden) return;
+    if (this.expanded) this.setExpanded(false);
+    if (!sidePanel()) this.close();
+  }
+
   private setExpanded(on: boolean): void {
     this.expanded = on;
     this.sheet.classList.toggle('expanded', on);
@@ -550,10 +561,25 @@ export function mapPadding(base = 40): { top: number; bottom: number; left: numb
   const H = window.innerHeight;
   const hud = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hud-h')) || 60;
   const sheet = document.querySelector<HTMLElement>('.g-sheet:not([hidden])')?.getBoundingClientRect();
-  if (W >= 900) return { top: hud + base, bottom: 90 + base, left: base, right: (sheet ? W - sheet.left : 0) + base };
+  // Panneau sur le côté : la place qu'il prend à droite (rien s'il est en plein écran).
+  const side = sheet && sheet.left > W * 0.25 ? W - sheet.left : 0;
+  if (W >= 900) return { top: hud + base, bottom: 90 + base, left: base, right: side + base };
+  if (side) {
+    // Téléphone couché : la carte garde la gauche de l'écran, au-dessus de la barre du bas.
+    const nav = document.body.classList.contains('game-on') ? 60 : 0;
+    return { top: hud + base / 2, bottom: nav + base / 2, left: base / 2, right: side + base / 2 };
+  }
   // Toujours au moins 140 px de carte visible, même panneau agrandi.
   const bottom = Math.min(sheet ? H - sheet.top : 80, H - hud - 140);
   return { top: hud + base / 2, bottom: bottom + base / 2, left: base / 2, right: base / 2 };
+}
+
+/**
+ * Le panneau s'affiche-t-il sur le côté de la carte (ordinateur, téléphone
+ * couché) plutôt qu'en bas de l'écran ? Même règle que dans game.css.
+ */
+export function sidePanel(): boolean {
+  return window.matchMedia('(min-width: 900px), (min-width: 600px) and (orientation: landscape)').matches;
 }
 
 /** La hauteur de la barre du temps change (retour à la ligne sur petit écran) : on la mesure. */

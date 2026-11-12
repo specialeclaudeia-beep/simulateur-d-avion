@@ -216,10 +216,11 @@ export function aircraftView(ui: Ui, id: string): View {
       if (!ac) return;
       switch (a) {
         case 'map':
+          ui.revealMap();
           if (ac.status === 'flying' && ac.leg) {
+            // Toucher (ou choisir) un avion ferme le panneau sur téléphone : voir index.ts.
             ui.aircraft.selectProvided(ac.leg.id);
             ui.aircraft.follow(true);
-            if (window.innerWidth < 900) ui.close();
           } else {
             ui.flyTo(ac.location, 9);
           }
