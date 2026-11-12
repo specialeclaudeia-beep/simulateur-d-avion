@@ -4,7 +4,8 @@
 import { describe, expect, it } from 'vitest';
 import * as act from '../src/game/actions';
 import { DAY, HOUR } from '../src/game/config';
-import { YEAR, crashChance, marketValue } from '../src/game/economy';
+import { YEAR, marketValue } from '../src/game/economy';
+import { CRASH_FREQUENCY, baseHullLossRate, crashRisk } from '../src/game/safety';
 import { generateUsedListings, orderQuote } from '../src/game/fleet';
 import { playerFlights, setFlightSource } from '../src/game/flights';
 import { upgradeInfo } from '../src/game/hubs';
@@ -423,9 +424,41 @@ describe('statistiques', () => {
     expect(again.ok && again.save.state.stats).toEqual(st);
   });
 
-  it('pas d’accident pour un avion bien entretenu', () => {
-    expect(crashChance(20, 1)).toBe(0);
-    expect(crashChance(60, 1)).toBe(0);
-    expect(crashChance(0, 1)).toBeGreaterThan(0);
+  it('risque d’accident tiré des vraies statistiques', () => {
+    const ctx = newTestGame('NCE', 'FR', 'normal', 7);
+    const d = ctx.data;
+    // Boeing 2025 : A320 0,17 par million de vols, MD-11 3,41.
+    expect(baseHullLossRate(d.model('a320ceo'))).toBeCloseTo(0.17e-6, 12);
+    expect(baseHullLossRate(d.model('md11f'))).toBeGreaterThan(baseHullLossRate(d.model('b777f')));
+    expect(baseHullLossRate(d.model('atr72-600'))).toBeGreaterThan(baseHullLossRate(d.model('a320neo')));
+    act.orderAircraft(ctx, T0, 'a320neo', 1, 'NCE');
+    const ac = ctx.state.aircraft[0];
+    ac.builtAt = T0;
+    const pilot = (stars: number) => ({ stars }) as never;
+    const ok = crashRisk(d, ac, pilot(3), T0).p;
+    expect(crashRisk(d, ac, pilot(1), T0).p).toBeGreaterThan(ok * 2);
+    expect(crashRisk(d, ac, pilot(5), T0).p).toBeLessThan(ok);
+    ac.condition = 20;
+    expect(crashRisk(d, ac, pilot(3), T0).p).toBeGreaterThan(ok * 10);
+    expect(crashRisk(d, ac, pilot(3), T0, 'aucun').p).toBe(0);
+  });
+
+  it('un accident détruit l’avion et se retrouve dans les statistiques', () => {
+    const { ctx, t } = readyGame(7);
+    ctx.state.settings.crashFrequency = 'frequent';
+    const freq = CRASH_FREQUENCY as { frequent: number };
+    const before = freq.frequent;
+    freq.frequent = 1e9; // risque plafonné à 50 % par vol
+    try {
+      advance(ctx, t + 20 * DAY);
+    } finally {
+      freq.frequent = before;
+    }
+    const s = ctx.state;
+    expect(s.stats.crashes).toBeGreaterThan(0);
+    expect(s.crashes.length).toBe(s.stats.crashes);
+    const c = s.crashes[0];
+    expect(c.fatalities + c.injured).toBeLessThanOrEqual(c.pax + c.crew);
+    expect(s.log.some((e) => e.ref?.type === 'crash')).toBe(true);
   });
 });

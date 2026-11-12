@@ -127,3 +127,32 @@ export class LoopSet {
     return this.loops.size;
   }
 }
+
+/**
+ * Explosion / impact : bruit filtré grave, attaque sèche et longue traîne
+ * (grondement), synthétisé pour ne pas ajouter de fichier.
+ */
+export function playImpact(volume = 1, delayS = 0): void {
+  if (!ctx || !master) return;
+  const dur = 3.5;
+  const buf = ctx.createBuffer(1, Math.round(ctx.sampleRate * dur), ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  let brown = 0;
+  for (let i = 0; i < data.length; i++) {
+    brown = (brown + 0.02 * (Math.random() * 2 - 1)) / 1.02;
+    data[i] = brown * 3.5 + (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.08)) * 0.6;
+  }
+  const t0 = ctx.currentTime + delayS;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(2400, t0);
+  lp.frequency.exponentialRampToValueAtTime(140, t0 + 1.2);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(volume, t0 + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(lp).connect(gain).connect(master);
+  src.start(t0);
+}

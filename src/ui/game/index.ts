@@ -33,6 +33,7 @@ import { closeSettings, openSettings } from '../settingsScreen';
 import { esc, money, plural } from './dom';
 import { logoHtml } from './logo';
 import { modeLabel } from './saves';
+import { showCrash } from './views/stats';
 import { Ui, sidePanel, type View } from './ui';
 import { campaignView, levelIntro, type CampaignHooks } from './views/campaign';
 import { companyView } from './views/company';
@@ -471,7 +472,12 @@ function notify(ui: Ui, game: Game, entries: LogEntry[], openGoals: () => void):
     // Échelon réussi, campagne terminée : une fenêtre l'annonce déjà (voir checkEvents).
     if (/^Échelon \d+ réussi/.test(e.text) || e.text.startsWith('Tu as gravi tous les échelons')) continue;
     const ref = e.ref;
-    if (ref?.type === 'aircraft') {
+    if (ref?.type === 'crash') {
+      const c = game.state.crashes.find((x) => x.id === ref.id);
+      if (!c) continue;
+      showCrash(ui, c);
+      ui.toast(e.text, 'bad', { label: 'Revoir', run: () => showCrash(ui, c) });
+    } else if (ref?.type === 'aircraft') {
       const ac = game.state.aircraft.find((a) => a.id === ref.id);
       const open = () => {
         ui.openTab('fleet');
@@ -492,6 +498,7 @@ function showAway(ui: Ui, s: AwaySummary): void {
     `<li>${s.flights ? plural(s.flights, 'vol effectué', 'vols effectués') : 'Aucun vol effectué'}</li>`,
     `<li>Trésorerie : <b class="${s.cash < 0 ? 'neg' : 'pos'}">${s.cash >= 0 ? '+' : ''}${esc(money(s.cash))}</b></li>`,
   ];
+  if (s.crashes) lines.push(`<li class="neg">${plural(s.crashes, 'accident')} : voir les statistiques</li>`);
   if (s.breakdowns) lines.push(`<li class="neg">${plural(s.breakdowns, 'panne')} : regarde ta flotte</li>`);
   void ui.alert('Pendant ton absence', `<p>Ton absence a duré ${esc(awayLabel(s.gameMs))}. Ta compagnie a continué de tourner :</p><ul class="g-away">${lines.join('')}</ul>`, 'Continuer');
 }

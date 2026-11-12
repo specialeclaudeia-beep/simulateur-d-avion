@@ -79,6 +79,7 @@ export function createNewGame(data: GameData, p: NewGameParams, now: number, see
     nextMonth: nextUtcMonth(now),
     counters: { aircraft: 0, pilot: 0, line: 0, listing: 0, candidate: 0, flight: 0, lineNumber: 0 },
     stats: newStats(),
+    crashes: [],
     log: [],
     settings: { ...DEFAULT_SETTINGS },
     mode,

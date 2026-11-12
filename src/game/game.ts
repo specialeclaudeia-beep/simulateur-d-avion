@@ -22,6 +22,7 @@ export interface AwaySummary {
   flights: number;
   cash: number;
   breakdowns: number;
+  crashes: number;
 }
 
 const TICK_MS = 250;
@@ -102,6 +103,7 @@ export class Game {
         flights: s.stats.flights - before.flights,
         cash: s.cash - before.cash,
         breakdowns: newEntries.filter((e) => e.kind === 'bad' && e.text.startsWith('Panne')).length,
+        crashes: newEntries.filter((e) => e.ref?.type === 'crash').length,
       };
       this.ctx.fresh = [];
     }

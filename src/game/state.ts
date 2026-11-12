@@ -5,6 +5,7 @@
  * fonctions) pour pouvoir être enregistré tel quel en JSON. Les dates sont
  * en millisecondes de temps de jeu (comme `clock.now()`).
  */
+import type { CrashFrequency } from './safety';
 import type { Difficulty } from './config';
 
 /**
@@ -168,6 +169,35 @@ export interface Leg {
   revenue: number;
   vat: number;
   costs: LegCosts;
+  /** Ce vol finira par un accident (tiré au décollage), à cet instant et à cette phase. */
+  crash?: { at: number; phase: CrashPhase };
+}
+
+export type CrashPhase = 'decollage' | 'montee' | 'croisiere' | 'approche' | 'atterrissage';
+
+/** Un accident, gardé pour l'écran des statistiques et l'animation. */
+export interface CrashRecord {
+  id: string;
+  t: number;
+  registration: string;
+  modelId: string;
+  phase: CrashPhase;
+  lon: number;
+  lat: number;
+  /** Cap de l'avion au moment de l'accident (degrés). */
+  heading: number;
+  from: string;
+  to: string;
+  /** Passagers et équipage à bord. */
+  pax: number;
+  crew: number;
+  fatalities: number;
+  injured: number;
+  /** Pilote aux commandes (nom) et son niveau, s'il y en avait un attitré. */
+  pilot: string | null;
+  pilotStars: number | null;
+  /** Probabilité d'accident de ce vol, telle que calculée au décollage. */
+  risk: number;
 }
 
 export interface Breakdown {
@@ -322,7 +352,7 @@ export interface LogEntry {
   t: number;
   kind: LogKind;
   text: string;
-  ref?: { type: 'aircraft' | 'pilot' | 'hub' | 'line'; id: string };
+  ref?: { type: 'aircraft' | 'pilot' | 'hub' | 'line' | 'crash'; id: string };
 }
 
 export interface Settings {
@@ -333,6 +363,8 @@ export interface Settings {
   autoRepair: boolean;
   /** Le temps continue (à vitesse réelle) quand le jeu est fermé. */
   offlineProgress: boolean;
+  /** Fréquence des accidents : réaliste (vraies statistiques), fréquente (× 100) ou aucun. */
+  crashFrequency: CrashFrequency;
 }
 
 // ───────────────────────── Partie ─────────────────────────
@@ -365,6 +397,8 @@ export interface GameState {
   nextMonth: number;
   counters: { aircraft: number; pilot: number; line: number; listing: number; candidate: number; flight: number; lineNumber: number };
   stats: GameStats;
+  /** Accidents de la partie, du plus ancien au plus récent. */
+  crashes: CrashRecord[];
   log: LogEntry[];
   settings: Settings;
   mode: GameMode;
@@ -409,6 +443,7 @@ export const DEFAULT_SETTINGS: Settings = {
   maintenanceThreshold: 60,
   autoRepair: false,
   offlineProgress: true,
+  crashFrequency: 'realiste',
 };
 
 export function emptyStats(): LineStats {

@@ -100,6 +100,7 @@ export function migrate(state: GameState, fromVersion: number): GameState {
   s.rivalry ??= {};
   s.campaign ??= null;
   s.stats = backfillStats(s);
+  s.crashes ??= [];
   s.version = SAVE_VERSION;
   return s;
 }

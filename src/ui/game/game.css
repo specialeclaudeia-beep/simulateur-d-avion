@@ -2357,3 +2357,155 @@ body.wizard-on .country-card {
 .g-stat-balance {
   margin-top: 8px;
 }
+
+/* ── Accident : scène animée sur la carte (crashScene.ts) ── */
+.cr-scene {
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  transition: opacity 4s ease;
+}
+
+.cr-scene.cr-out {
+  opacity: 0;
+}
+
+.cr-frame,
+.cr-smoke,
+.cr-rescue {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+}
+
+.cr-plane,
+.cr-shadow,
+.cr-wreck {
+  position: absolute;
+  left: -32px;
+  top: -32px;
+  visibility: hidden;
+  will-change: transform;
+}
+
+.cr-plane svg {
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.6));
+}
+
+.cr-shadow {
+  filter: blur(2px);
+  opacity: 0.4;
+}
+
+.cr-wreck {
+  left: -48px;
+  top: -48px;
+  transform: translateY(-20px);
+}
+
+.cr-hit .cr-wreck {
+  visibility: visible;
+  animation: cr-appear 0.8s 0.25s both;
+}
+
+.cr-scorch {
+  position: absolute;
+  left: -40px;
+  top: -110px;
+  width: 80px;
+  height: 170px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 60%, rgba(20, 12, 6, 0.85), rgba(40, 25, 12, 0.4) 55%, transparent 72%);
+  opacity: 0;
+}
+
+.cr-hit .cr-scorch {
+  animation: cr-appear 1.5s 0.2s both;
+}
+
+.cr-flash {
+  position: absolute;
+  left: -60px;
+  top: -60px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, #ffe9a8 22%, #ff9a2e 45%, rgba(255, 80, 0, 0) 70%);
+  opacity: 0;
+  mix-blend-mode: screen;
+}
+
+.cr-hit .cr-flash {
+  animation: cr-flash 1.4s ease-out both;
+}
+
+.cr-debris i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 1px;
+  background: #2a2522;
+}
+
+.cr-fire i {
+  position: absolute;
+  border-radius: 50% 50% 45% 45%;
+  background: radial-gradient(circle at 50% 60%, #fff3b0 0%, #ffb12e 35%, #ff5a1a 60%, rgba(200, 30, 0, 0) 75%);
+  mix-blend-mode: screen;
+  transform: translate(-50%, -50%);
+  animation: cr-flicker 0.5s ease-in-out infinite alternate;
+  transition: opacity 6s ease;
+}
+
+.cr-out-fire .cr-fire i {
+  opacity: 0;
+}
+
+.cr-smoke i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin: -16px 0 0 -16px;
+  border-radius: 50%;
+}
+
+.cr-rescue i {
+  position: absolute;
+  left: -3px;
+  top: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  background: #d22;
+  animation: cr-beacon 0.5s steps(2) infinite;
+}
+
+@keyframes cr-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes cr-flash {
+  0% { opacity: 1; transform: scale(0.2); }
+  25% { opacity: 1; transform: scale(1.6); }
+  100% { opacity: 0; transform: scale(2.6); }
+}
+
+@keyframes cr-flicker {
+  from { transform: translate(-50%, -50%) scale(0.85); opacity: 0.75; }
+  to { transform: translate(-50%, -58%) scale(1.15); opacity: 1; }
+}
+
+@keyframes cr-beacon {
+  0% { box-shadow: 0 0 8px 3px rgba(255, 40, 40, 0.9); }
+  100% { box-shadow: 0 0 8px 3px rgba(60, 120, 255, 0.9); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cr-fire i,
+  .cr-rescue i {
+    animation: none;
+  }
+}

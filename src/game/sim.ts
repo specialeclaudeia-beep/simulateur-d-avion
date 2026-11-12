@@ -18,8 +18,6 @@ import {
   CHECK_HOURS_BASE,
   CHECK_HOURS_PER_POINT,
   COMPENSATION_PER_PAX,
-  CRASH_COMPENSATION_MULT,
-  CRASH_REPUTATION,
   DAY,
   HOUR,
   HUB_UPKEEP_PER_DAY,
@@ -45,7 +43,6 @@ import {
   aircraftValue,
   blockMinutes,
   breakdownChance,
-  crashChance,
   cargoCapOf,
   domesticVatRate,
   legCosts,
@@ -66,8 +63,21 @@ import { generateUsedListings } from './fleet';
 import { closeMonth, earn, snapDay, spend } from './ledger';
 import { generateCandidates, pilotName } from './pilots';
 import { randRange } from './rng';
+import {
+  CRASH_REPUTATION,
+  CRASH_REPUTATION_FATAL,
+  HULL_DEDUCTIBLE,
+  LIABILITY_DEDUCTIBLE,
+  LIABILITY_PER_DEATH,
+  LIABILITY_PER_INJURED,
+  PHASES,
+  PHASE_LABEL,
+  crashRisk,
+  crewOf,
+} from './safety';
+import { angleBetween, bearing as geoBearing, interpolate, toVec } from '../flights/geo';
 import { lineFrequency } from './schedule';
-import type { Aircraft, Line, Pilot } from './state';
+import type { Aircraft, CrashRecord, Line, Pilot } from './state';
 import { localMinutes, nextLocalTime, nextUtcMonth } from './time';
 
 // ───────────────────────── Boucle principale ─────────────────────────
@@ -128,7 +138,7 @@ export function advance(ctx: Ctx, to: number): void {
 export function nextEventTime(ac: Aircraft): number | null {
   switch (ac.status) {
     case 'flying':
-      return ac.leg ? ac.leg.arr : null;
+      return ac.leg ? (ac.leg.crash?.at ?? ac.leg.arr) : null;
     case 'delivery':
     case 'ground':
     case 'maintenance':
@@ -145,7 +155,8 @@ function onAircraftEvent(ctx: Ctx, ac: Aircraft, t: number): void {
   const { data } = ctx;
   switch (ac.status) {
     case 'flying':
-      arrive(ctx, ac, t);
+      if (ac.leg?.crash) crash(ctx, ac, t);
+      else arrive(ctx, ac, t);
       return;
     case 'delivery': {
       ac.status = 'ground';
@@ -338,8 +349,21 @@ export function depart(ctx: Ctx, ac: Aircraft, from: string, to: string, line: L
     vat,
     costs,
   };
+  rollCrash(ctx, ac, pilot, t);
   ac.status = 'flying';
   ac.until = null;
+}
+
+/** Au décollage : ce vol finira-t-il mal ? Si oui, on fixe la phase et l'instant. */
+function rollCrash(ctx: Ctx, ac: Aircraft, pilot: Pilot | null, t: number): void {
+  const { data, rng, state: s } = ctx;
+  const leg = ac.leg!;
+  const risk = crashRisk(data, ac, pilot, t, s.settings.crashFrequency);
+  if (!(rng() < risk.p)) return;
+  let r = rng();
+  const spec = PHASES.find((p) => (r -= p.share) < 0) ?? PHASES[PHASES.length - 1];
+  const f = randRange(rng, spec.at);
+  leg.crash = { at: Math.round(leg.dep + (leg.arr - leg.dep) * f + (f === 0 ? 60_000 : 0)), phase: spec.phase };
 }
 
 /** Arrivée : on encaisse, on use l'avion, on fait progresser le pilote, et parfois… une panne. */
@@ -402,10 +426,6 @@ function arrive(ctx: Ctx, ac: Aircraft, t: number): void {
     }
   }
 
-  if (rng() < crashChance(ac.condition, pilot?.stars ?? 1)) {
-    crash(ctx, ac, leg.pax, t);
-    return;
-  }
   const baseLevel = s.hubs.find((h) => h.iata === ac.base)?.maintenance ?? 0;
   if (rng() < breakdownChance(ac.condition, pilot?.stars ?? 1, baseLevel)) {
     breakDown(ctx, ac, t);
@@ -416,23 +436,76 @@ function arrive(ctx: Ctx, ac: Aircraft, t: number): void {
 }
 
 /**
- * Accident : l'avion est détruit à l'atterrissage (tout le monde est évacué).
- * Il est rayé de la flotte, sans remboursement, et la réputation en souffre.
+ * Accident : l'avion est détruit. Les victimes et les blessés dépendent de la
+ * phase du vol ; l'assurance rembourse l'avion et la plus grande part des
+ * indemnisations, mais la réputation en prend un coup.
  */
-function crash(ctx: Ctx, ac: Aircraft, pax: number, t: number): void {
-  const { state: s, data } = ctx;
+function crash(ctx: Ctx, ac: Aircraft, t: number): void {
+  const { state: s, data, rng } = ctx;
+  const leg = ac.leg!;
+  const model = data.model(ac.modelId);
   const pilot = pilotOf(ctx, ac);
-  if (pilot) pilot.aircraftId = null;
-  s.aircraft = s.aircraft.filter((a) => a !== ac);
+  const spec = PHASES.find((p) => p.phase === leg.crash!.phase)!;
+  const A = data.airport(leg.from);
+  const B = data.airport(leg.to);
+  const f = Math.min(1, Math.max(0, (t - leg.dep) / Math.max(1, leg.arr - leg.dep)));
+  const va = toVec(A.lon, A.lat);
+  const vb = toVec(B.lon, B.lat);
+  const [lon, lat] = interpolate(va, vb, angleBetween(va, vb), f, [0, 0]);
+  const [lon2, lat2] = interpolate(va, vb, angleBetween(va, vb), Math.min(1, f + 0.001), [0, 0]);
+  const heading = f >= 0.999 ? geoBearing(A.lon, A.lat, B.lon, B.lat) : geoBearing(lon, lat, lon2, lat2);
+
+  const crew = crewOf(model);
+  const onboard = leg.pax + crew;
+  const fatal = rng() < spec.fatal;
+  const fatalities = fatal ? Math.max(1, Math.round(onboard * randRange(rng, spec.killed))) : 0;
+  const injured = Math.round((onboard - fatalities) * randRange(rng, fatal ? [0.3, 0.9] : [0.02, 0.3]));
+
+  const record: CrashRecord = {
+    id: `${leg.id}-x`,
+    t,
+    registration: ac.registration,
+    modelId: ac.modelId,
+    phase: spec.phase,
+    lon,
+    lat,
+    heading,
+    from: leg.from,
+    to: leg.to,
+    pax: leg.pax,
+    crew,
+    fatalities,
+    injured,
+    pilot: pilot ? pilotName(pilot) : null,
+    pilotStars: pilot?.stars ?? null,
+    risk: leg.crash ? crashRisk(data, ac, pilot, leg.dep, s.settings.crashFrequency).p : 0,
+  };
+  s.crashes.push(record);
   s.stats.crashes++;
-  spend(s, 'compensation', pax * COMPENSATION_PER_PAX * CRASH_COMPENSATION_MULT);
-  s.reputation = Math.max(0, s.reputation - CRASH_REPUTATION);
+
+  // L'avion est perdu ; l'assurance corps rembourse sa valeur moins la franchise.
+  const hull = aircraftValue(data, ac, t);
+  if (pilot) {
+    pilot.aircraftId = null;
+    // En cas d'accident mortel, l'équipage de conduite figure presque toujours parmi les victimes.
+    if (fatal && fatalities >= Math.min(onboard, crew)) s.pilots = s.pilots.filter((p) => p !== pilot);
+  }
+  s.aircraft = s.aircraft.filter((a) => a !== ac);
+  earn(s, 'assetSales', hull * (1 - HULL_DEDUCTIBLE));
+  spend(s, 'compensation', (fatalities * LIABILITY_PER_DEATH + injured * LIABILITY_PER_INJURED) * LIABILITY_DEDUCTIBLE);
+  // Les billets du vol sont remboursés : pas de recette.
+  s.reputation = Math.max(0, s.reputation - (fatal ? CRASH_REPUTATION_FATAL : CRASH_REPUTATION));
   invalidate(ctx);
+
+  const where = spec.phase === 'decollage' ? cityOf(ctx, leg.from) : spec.phase === 'atterrissage' ? cityOf(ctx, leg.to) : null;
+  const toll = fatal
+    ? `${fatalities} ${fatalities > 1 ? 'victimes' : 'victime'}${injured ? `, ${injured} ${injured > 1 ? 'blessés' : 'blessé'}` : ''}`
+    : `aucune victime${injured ? `, ${injured} ${injured > 1 ? 'blessés' : 'blessé'}` : ''}`;
   log(
     ctx,
     'bad',
-    `Accident : ${ac.registration} (${data.model(ac.modelId).name}) est détruit à l’atterrissage à ${cityOf(ctx, ac.location)}. Tout le monde a été évacué, mais l’avion est perdu.`,
-    undefined,
+    `Accident ${PHASE_LABEL[spec.phase]}${where ? ` à ${where}` : ''} : ${ac.registration} (${model.name}, vol ${leg.callsign} ${leg.from}→${leg.to}) est détruit. ${toll}.`,
+    { type: 'crash', id: record.id },
     t,
   );
 }

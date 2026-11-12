@@ -11,8 +11,6 @@ import {
   BLOCK_OVERHEAD_MIN,
   BLOCK_SPEED_FACTOR,
   BREAKDOWN_BASE,
-  CRASH_CONDITION,
-  CRASH_MAX,
   BREAKDOWN_WEAR,
   CARGO_T_PER_PAX,
   COMPETITOR_STRENGTH,
@@ -247,12 +245,6 @@ export function wearPerLeg(minutes: number, age: number): number {
 }
 
 /** Probabilité qu'une panne soit découverte à l'arrivée d'un vol. */
-/** Probabilité d'accident par vol : nulle tant que l'avion est correctement entretenu. */
-export function crashChance(condition: number, pilotStars: number): number {
-  if (condition >= CRASH_CONDITION) return 0;
-  return CRASH_MAX * ((CRASH_CONDITION - condition) / CRASH_CONDITION) * (1.15 - 0.05 * pilotStars);
-}
-
 export function breakdownChance(condition: number, pilotStars: number, baseMaintenanceLevel: number): number {
   const wear = Math.max(0, 100 - condition) / 100;
   const p = BREAKDOWN_BASE + BREAKDOWN_WEAR * wear ** 3;
