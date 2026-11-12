@@ -15,7 +15,7 @@
 export interface Track {
   file: string;
   title: string;
-  /** Correction de volume : les trois morceaux sonnent aussi fort (mesuré à −18 LUFS). */
+  /** Correction de volume : les morceaux sonnent aussi fort (mesuré à −18 LUFS). */
   gain: number;
 }
 
@@ -23,6 +23,8 @@ export const TRACKS: Track[] = [
   { file: 'clairiere-mecanique.mp3', title: 'Clairière mécanique', gain: 0.7 },
   { file: 'horizon-usine.mp3', title: 'Horizon usine', gain: 1 },
   { file: 'trajectoire-du-noyau.mp3', title: 'Trajectoire du noyau', gain: 0.85 },
+  // Composée en notation ABC : partition et fabrication dans scripts/musique/.
+  { file: 'altitude-de-croisiere.mp3', title: 'Altitude de croisière', gain: 1 },
 ];
 
 const STORAGE_KEY = 'simulateur-compagnie:son';

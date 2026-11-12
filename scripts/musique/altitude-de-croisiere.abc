@@ -1,0 +1,56 @@
+X:1
+T:Altitude de croisière
+C:Musique du Simulateur de compagnie aérienne
+M:4/4
+L:1/8
+Q:1/4=88
+K:D
+%%score (1 2) 3 4
+V:1 name="Mélodie" clef=treble
+V:2 name="Arpèges" clef=treble
+V:3 name="Nappe" clef=treble
+V:4 name="Basse" clef=bass
+[V:1]
+"D"z8 | "G"z8 | "D"z8 | "A"z8 |
+|: "D"F2 A2 d3 c | "Bm"B2 F2 d4 | "G"B2 d2 g2 f e | "A"e6 z2 |
+"D"f2 e d A2 d2 | "F#m"c2 A2 F4 | "G"G2 B2 d2 e d | "A"c6 z2 |
+"D"F2 A2 d3 e | "Bm"f2 d2 B4 | "G"g2 f e d2 B2 | "A"c2 e2 a4 |
+"D"a2 f d A2 f2 | "F#m"e2 c A F2 A2 | "G"B2 d2 c2 B c | "D"d6 z2 |
+"G"d2 B G B2 d2 | "A"c2 A E A2 c2 | "F#m"A2 c2 f3 e | "Bm"d6 z2 |
+"Em"B2 e2 g3 f | "A"e2 c A c2 e2 | "D"f2 d A d2 f2 | "A"e6 z2 |
+"G"g2 f e d2 B2 | "A"c2 e2 a3 g | "F#m"f2 e c A2 c2 | "Bm"d2 f2 b4 |
+"Em"g2 f e B2 e2 | "A"c4 e4 | "D"d8 | "D"z8 :|
+"G"z8 | "A"z8 | "D"z8 | "D"z8 |]
+[V:2]
+D A d f a d f A | G D g b d g b D | D A d f a d f A | A E a c e a c E |
+|: D A d f a d f A | B F b d f b d F | G D g b d g b D | A E a c e a c E |
+D A d f a d f A | F C f a c f a C | G D g b d g b D | A E a c e a c E |
+D A d f a d f A | B F b d f b d F | G D g b d g b D | A E a c e a c E |
+D A d f a d f A | F C f a c f a C | G D g b d g b D | D A d f a d f A |
+G D g b d g b D | A E a c e a c E | F C f a c f a C | B F b d f b d F |
+E B e g b e g B | A E a c e a c E | D A d f a d f A | A E a c e a c E |
+G D g b d g b D | A E a c e a c E | F C f a c f a C | B F b d f b d F |
+E B e g b e g B | A E a c e a c E | D A d f a d f A | D A d f a d f A :|
+G D g b d g b D | A E a c e a c E | D A d f a d f A | D A d f a d f A |]
+[V:3]
+[DFA]8 | [G,BD]8 | [DFA]8 | [A,CE]8 |
+|: [DFA]8 | [B,DF]8 | [G,BD]8 | [A,CE]8 |
+[DFA]8 | [FAC]8 | [G,BD]8 | [A,CE]8 |
+[DFA]8 | [B,DF]8 | [G,BD]8 | [A,CE]8 |
+[DFA]8 | [FAC]8 | [G,BD]8 | [DFA]8 |
+[G,BD]8 | [A,CE]8 | [FAC]8 | [B,DF]8 |
+[EGB]8 | [A,CE]8 | [DFA]8 | [A,CE]8 |
+[G,BD]8 | [A,CE]8 | [FAC]8 | [B,DF]8 |
+[EGB]8 | [A,CE]8 | [DFA]8 | [DFA]8 :|
+[G,BD]8 | [A,CE]8 | [DFA]8 | [DFA]8 |]
+[V:4]
+D,,4 A,,4 | G,,4 D,,4 | D,,4 A,,4 | A,,,4 E,,4 |
+|: D,,4 A,,4 | B,,,4 F,,4 | G,,4 D,,4 | A,,,4 E,,4 |
+D,,4 A,,4 | F,,4 C,,4 | G,,4 D,,4 | A,,,4 E,,4 |
+D,,4 A,,4 | B,,,4 F,,4 | G,,4 D,,4 | A,,,4 E,,4 |
+D,,4 A,,4 | F,,4 C,,4 | G,,4 D,,4 | D,,4 A,,4 |
+G,,4 D,,4 | A,,,4 E,,4 | F,,4 C,,4 | B,,,4 F,,4 |
+E,,4 B,,4 | A,,,4 E,,4 | D,,4 A,,4 | A,,,4 E,,4 |
+G,,4 D,,4 | A,,,4 E,,4 | F,,4 C,,4 | B,,,4 F,,4 |
+E,,4 B,,4 | A,,,4 E,,4 | D,,4 A,,4 | D,,4 A,,4 :|
+G,,4 D,,4 | A,,,4 E,,4 | D,,4 A,,4 | D,,4 A,,4 |]
