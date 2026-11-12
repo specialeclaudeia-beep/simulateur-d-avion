@@ -637,7 +637,7 @@ export function loanCapacity(ctx: Ctx, t: number): number {
 export function borrow(ctx: Ctx, t: number, amount: number): ActionResult {
   const max = loanCapacity(ctx, t);
   if (!(amount > 0)) return fail('Montant invalide.');
-  if (amount > max) return fail(`La banque prête au plus ${money(max)} de plus.`);
+  if (amount > max) return fail(max > 0 ? `La banque prête au plus ${money(max)} de plus.` : 'La banque ne te prête plus rien : rembourse d’abord une partie de ta dette.');
   ctx.state.debt += amount;
   ctx.state.cash += amount;
   log(ctx, 'money', `Emprunt de ${money(amount)}`, undefined, t);

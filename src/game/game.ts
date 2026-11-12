@@ -95,15 +95,17 @@ export class Game {
     this.onTimeJump();
     let summary: AwaySummary | null = null;
     if (away > 60_000) {
-      const before = { cash: s.cash, flights: s.stats.flights, logLen: s.log.length, first: s.log[0] };
+      const before = { cash: s.cash, flights: s.stats.flights, crashes: s.stats.crashes };
+      this.ctx.fresh = [];
       advance(this.ctx, this.clock.now());
-      const newEntries = before.first ? s.log.slice(0, s.log.indexOf(before.first)) : s.log;
+      // Tout ce qui s'est passé (le journal, lui, ne garde que les dernières lignes).
+      const newEntries = this.ctx.fresh;
       summary = {
         gameMs: away,
         flights: s.stats.flights - before.flights,
         cash: s.cash - before.cash,
         breakdowns: newEntries.filter((e) => e.kind === 'bad' && e.text.startsWith('Panne')).length,
-        crashes: newEntries.filter((e) => e.ref?.type === 'crash').length,
+        crashes: s.stats.crashes - before.crashes,
       };
       this.ctx.fresh = [];
     }

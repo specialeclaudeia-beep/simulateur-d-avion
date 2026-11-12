@@ -462,6 +462,28 @@ describe('mode par échelons', () => {
     expect(act.orderAircraft(ctx, t, 'e175', 1, hub).ok || modelProblem(s, data.model('e175')) === null).toBe(true);
   });
 
+  it('dans le nouveau pays : rivales locales, et satisfaction à reconstruire', () => {
+    const { ctx, t } = clearedLevel1();
+    const s = ctx.state;
+    const data = realData();
+    dailyCompetition(ctx, t);
+    const before = Object.keys(s.rivals);
+    expect(before.length).toBeGreaterThan(0);
+    s.reputation = 95;
+    const hub = hubsFor(data, 'ES', 2).filter((a) => a.price < 20e6)[0].iata;
+    expect(nextLevel(ctx, t, { country: 'ES', hub, perks: perkOffer(s).slice(0, picksAllowed(s.campaign!)) }).ok).toBe(true);
+    // Le premier objectif ne doit pas être offert dès l'arrivée.
+    expect(s.reputation).toBeLessThan(LEVELS[1].satisfaction);
+    evaluate(ctx, t);
+    expect(s.campaign!.reached.satisfaction).toBe(false);
+    // Les rivales françaises restent en France ; celles de l'Espagne arrivent.
+    dailyCompetition(ctx, t + DAY);
+    const after = Object.keys(s.rivals);
+    expect(after.length).toBeGreaterThan(0);
+    expect(after).not.toEqual(before);
+    for (const code of after) expect(data.airlineByCode.get(code)!.country === 'ES' || data.routesFrom(hub).some((r) => r.airlines.includes(code))).toBe(true);
+  });
+
   it('recommence l’échelon après une faillite, avec le même capital', () => {
     const ctx = newCampaignGame();
     const s = ctx.state;
