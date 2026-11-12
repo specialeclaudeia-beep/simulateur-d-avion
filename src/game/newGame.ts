@@ -85,6 +85,7 @@ export function createNewGame(data: GameData, p: NewGameParams, now: number, see
     mode,
     competition: campaign ? true : (p.competition ?? true),
     rivalry: {},
+    rivals: {},
     campaign,
   };
   const ctx = makeCtx(data, state);

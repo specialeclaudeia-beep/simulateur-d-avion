@@ -2509,3 +2509,30 @@ body.wizard-on .country-card {
     animation: none;
   }
 }
+
+/* Compagnies rivales */
+.g-rival {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.g-rival-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.g-rival-head small {
+  display: block;
+  opacity: 0.75;
+}
+.g-rival-logo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #fff;
+  flex: none;
+}
+.g-rival-moves li {
+  grid-template-columns: 1fr auto;
+}

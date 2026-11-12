@@ -6,6 +6,7 @@
  * l'accueil, nouvelle partie).
  */
 import * as act from '../../../game/actions';
+import { rivalCompanies } from '../../../game/competition';
 import { goalsReached, levelSpec } from '../../../game/campaign';
 import { DIFFICULTIES } from '../../../game/config';
 import { exportFileName, serialize } from '../../../game/save';
@@ -17,6 +18,7 @@ import { badge, btn, compact, dateLong, esc, flagEmoji, kv, money, num, row, sec
 import { logoHtml } from '../logo';
 import { copyText, downloadText, readImport } from '../saves';
 import type { Ui, View } from '../ui';
+import { rivalsView } from './rivals';
 import { playTime as statsPlayTime, statsView } from './stats';
 
 export interface CompanyHooks {
@@ -81,6 +83,26 @@ function goalsRow(ui: Ui): string {
   })}</div>`;
 }
 
+/** Partie avec concurrence : accès à l'écran des compagnies rivales. */
+function rivalsSection(ui: Ui): string {
+  const list = rivalCompanies(ui.ctx);
+  if (!list.length) return '';
+  const top = list.filter((x) => x.lines).slice(0, 3);
+  const last = list
+    .flatMap((x) => x.co.moves.slice(0, 1).map((m) => ({ ...m, code: x.co.code })))
+    .sort((a, b) => b.t - a.t)[0];
+  const sub = last ? `Dernière décision : ${esc(ui.game.data.airlineName(last.code))} ${esc(last.text)}` : `${list.length} compagnies jouent contre toi`;
+  return section(
+    'Concurrence',
+    `<div class="g-list">${row({
+      action: 'rivals',
+      icon: icon('podium', 22),
+      title: top.length ? `Face à toi : ${top.map((x) => esc(ui.game.data.airlineName(x.co.code))).join(', ')}` : 'Compagnies rivales',
+      sub,
+    })}</div>`,
+  );
+}
+
 export function companyView(ui: Ui, hooks: CompanyHooks): View {
   return {
     tab: 'company',
@@ -119,6 +141,7 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
           ]) +
             `<div class="g-list">${row({ action: 'stats', icon: icon('chart', 22), title: 'Toutes les statistiques', sub: `Temps de jeu ${statsPlayTime(s.stats.playMs)} · ${num(s.stats.hours)} h de vol · ${num(s.stats.crashes)} crash${s.stats.crashes > 1 ? 's' : ''}` })}</div>`,
         )}
+        ${rivalsSection(ui)}
         ${section(
           'Classement mondial',
           `<p>Avec <b>${s.lines.length}</b> ${s.lines.length > 1 ? 'lignes' : 'ligne'}, ta compagnie serait <b>${num(r.rank)}<sup>e</sup></b> sur ${num(r.total)} compagnies réelles${r.neighbour ? `, juste derrière ${esc(r.neighbour)}` : ' : la première du monde !'}.</p>`,
@@ -177,6 +200,7 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
       else if (a === 'paste') void pasteSaveCode(ui, hooks);
       else if (a === 'goals') hooks.goals();
       else if (a === 'stats') ui.push(statsView(ui));
+      else if (a === 'rivals') ui.push(rivalsView(ui));
       else if (a === 'settings') hooks.settings();
       else if (a === 'home') hooks.home();
       else if (a === 'install') {

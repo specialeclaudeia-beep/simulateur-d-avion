@@ -98,6 +98,7 @@ export function migrate(state: GameState, fromVersion: number): GameState {
   s.mode ??= 'libre';
   s.competition ??= true;
   s.rivalry ??= {};
+  s.rivals ??= {};
   s.campaign ??= null;
   s.stats = backfillStats(s);
   s.crashes ??= [];
