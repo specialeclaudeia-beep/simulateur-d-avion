@@ -9,6 +9,7 @@ import * as act from '../../../game/actions';
 import { goalsReached, levelSpec } from '../../../game/campaign';
 import { DIFFICULTIES } from '../../../game/config';
 import { exportFileName, serialize } from '../../../game/save';
+import type { CrashFrequency } from '../../../game/safety';
 import type { LogEntry } from '../../../game/state';
 import { canInstall, install, isInstalled } from '../../../pwa';
 import { icon, type IconName } from '../../icons';
@@ -16,6 +17,7 @@ import { badge, btn, compact, dateLong, esc, flagEmoji, kv, money, num, row, sec
 import { logoHtml } from '../logo';
 import { copyText, downloadText, readImport } from '../saves';
 import type { Ui, View } from '../ui';
+import { playTime as statsPlayTime, statsView } from './stats';
 
 export interface CompanyHooks {
   /** Recommencer une partie dans le même mode (l'actuelle n'est remplacée qu'à la création de la nouvelle). */
@@ -114,7 +116,8 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
             ['Passagers transportés', num(s.stats.pax)],
             ['Distance parcourue', `${compact(s.stats.km)} km`],
             ['Recettes totales', money(s.stats.revenue)],
-          ]),
+          ]) +
+            `<div class="g-list">${row({ action: 'stats', icon: icon('chart', 22), title: 'Toutes les statistiques', sub: `Temps de jeu ${statsPlayTime(s.stats.playMs)} · ${num(s.stats.hours)} h de vol · ${num(s.stats.crashes)} crash${s.stats.crashes > 1 ? 's' : ''}` })}</div>`,
         )}
         ${section(
           'Classement mondial',
@@ -126,6 +129,16 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
              <select class="g-input inline" data-in="maintenanceThreshold">${[40, 50, 60, 70, 80].map((v) => `<option value="${v}"${v === st.maintenanceThreshold ? ' selected' : ''}>${v} %</option>`).join('')}</select></span></label>
            <label class="g-toggle"><input type="checkbox" data-in="autoRepair"${st.autoRepair ? ' checked' : ''}><span>Réparer automatiquement les pannes</span></label>
            <label class="g-toggle"><input type="checkbox" data-in="offlineProgress"${st.offlineProgress ? ' checked' : ''}><span>Le temps continue quand le jeu est fermé (jusqu’à 7 jours, à vitesse réelle)</span></label>
+           <label class="g-toggle"><span>Accidents d’avion
+             <select class="g-input inline" data-in="crashFrequency">${(
+               [
+                 ['realiste', 'réalistes (vraies statistiques)'],
+                 ['frequent', 'fréquents (× 100)'],
+                 ['aucun', 'désactivés'],
+               ] as const
+             )
+               .map(([v, l]) => `<option value="${v}"${v === st.crashFrequency ? ' selected' : ''}>${l}</option>`)
+               .join('')}</select></span></label>
            <div class="g-list">${row({ action: 'settings', icon: icon('gear', 22), title: 'Paramètres du jeu', sub: 'Son, graphismes, images par seconde, touches du clavier' })}</div>`,
         )}
         ${section('Journal', journal ? `<ul class="g-log">${journal}</ul>` : '<p class="g-small">Rien pour l’instant.</p>')}
@@ -152,7 +165,8 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
         return;
       }
       if (!final) return;
-      if (key === 'maintenanceThreshold') ui.act(act.updateSettings, { maintenanceThreshold: Number(el.value) });
+      if (key === 'crashFrequency') ui.act(act.updateSettings, { crashFrequency: el.value as CrashFrequency });
+      else if (key === 'maintenanceThreshold') ui.act(act.updateSettings, { maintenanceThreshold: Number(el.value) });
       else if (key === 'autoMaintenance' || key === 'autoRepair' || key === 'offlineProgress') {
         ui.act(act.updateSettings, { [key]: (el as HTMLInputElement).checked });
       }
@@ -162,6 +176,7 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
       else if (a === 'copy') void copySaveCode(ui);
       else if (a === 'paste') void pasteSaveCode(ui, hooks);
       else if (a === 'goals') hooks.goals();
+      else if (a === 'stats') ui.push(statsView(ui));
       else if (a === 'settings') hooks.settings();
       else if (a === 'home') hooks.home();
       else if (a === 'install') {

@@ -178,6 +178,7 @@ export function orderAircraft(ctx: Ctx, t: number, modelId: string, qty: number,
   if (no) return no;
   spend(s, 'aircraftPurchase', q.total);
   s.relations[model.mfr] = (s.relations[model.mfr] ?? 0) + qty;
+  s.stats.bought += qty;
   for (const when of q.deliveries) {
     s.aircraft.push(newAircraft(ctx, model.id, base, t, { builtAt: when, acquiredAt: when, until: when, pricePaid: q.unitPrice }));
   }
@@ -198,6 +199,7 @@ export function buyUsed(ctx: Ctx, t: number, listingId: string, base: string): A
   const no = cantAfford(ctx, listing.price);
   if (no) return no;
   spend(s, 'aircraftPurchase', listing.price);
+  s.stats.bought++;
   s.market.used = s.market.used.filter((l) => l !== listing);
   const when = t + USED_DELIVERY_HOURS * HOUR;
   s.aircraft.push(

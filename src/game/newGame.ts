@@ -9,7 +9,7 @@ import { log, makeCtx, type Ctx } from './context';
 import type { GameData } from './data';
 import { newLedger } from './ledger';
 import { refreshMarkets } from './sim';
-import { DEFAULT_SETTINGS, SAVE_VERSION, type GameMode, type GameState, type Logo } from './state';
+import { DEFAULT_SETTINGS, SAVE_VERSION, type GameMode, type GameState, type Logo, newStats } from './state';
 import { nextUtcDay, nextUtcMonth } from './time';
 
 export interface NewGameParams {
@@ -78,7 +78,8 @@ export function createNewGame(data: GameData, p: NewGameParams, now: number, see
     nextDay: nextUtcDay(now),
     nextMonth: nextUtcMonth(now),
     counters: { aircraft: 0, pilot: 0, line: 0, listing: 0, candidate: 0, flight: 0, lineNumber: 0 },
-    stats: { flights: 0, pax: 0, cargoT: 0, km: 0, revenue: 0 },
+    stats: newStats(),
+    crashes: [],
     log: [],
     settings: { ...DEFAULT_SETTINGS },
     mode,

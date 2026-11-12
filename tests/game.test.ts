@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import * as act from '../src/game/actions';
 import { DAY, HOUR } from '../src/game/config';
 import { YEAR, marketValue } from '../src/game/economy';
+import { CRASH_FREQUENCY, baseHullLossRate, crashRisk } from '../src/game/safety';
 import { generateUsedListings, orderQuote } from '../src/game/fleet';
 import { playerFlights, setFlightSource } from '../src/game/flights';
 import { upgradeInfo } from '../src/game/hubs';
@@ -387,5 +388,77 @@ describe('variété et trajectoires', () => {
     expect(gap).toBeLessThan(41);
     const start = interpolate(a, b, om, 0, [0, 0], lat);
     expect(distanceKm(start[0], start[1], 2.55, 49.01)).toBeLessThan(0.01);
+  });
+});
+
+describe('statistiques', () => {
+  it('comptent l’argent, les heures de vol et les avions achetés', () => {
+    const { ctx, t } = readyGame(7);
+    const s = ctx.state;
+    expect(s.stats.bought).toBeGreaterThan(0);
+    const cash0 = s.cash;
+    const earned0 = s.stats.earned;
+    const spent0 = s.stats.spent;
+    advance(ctx, t + 20 * DAY);
+    expect(s.stats.hours).toBeGreaterThan(0);
+    // Hors emprunts, la trésorerie bouge exactement de « encaissé − dépensé ».
+    expect(s.cash - cash0).toBeCloseTo(s.stats.earned - earned0 - (s.stats.spent - spent0), 2);
+  });
+
+  it('sont reconstituées pour une ancienne sauvegarde et survivent à l’export', () => {
+    const { ctx, t } = readyGame(7);
+    advance(ctx, t + 10 * DAY);
+    const old = JSON.parse(serialize(ctx.state));
+    const { flights, pax, cargoT, km, revenue } = old.state.stats;
+    old.state.stats = { flights, pax, cargoT, km, revenue };
+    const res = parseSave(JSON.stringify(old));
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    const st = res.save.state.stats;
+    expect(st.crashes).toBe(0);
+    expect(st.playMs).toBe(0);
+    expect(st.bought).toBeGreaterThanOrEqual(ctx.state.aircraft.length);
+    expect(st.earned).toBeGreaterThan(0);
+    expect(st.hours).toBeGreaterThan(0);
+    const again = parseSave(serialize(res.save.state));
+    expect(again.ok && again.save.state.stats).toEqual(st);
+  });
+
+  it('risque d’accident tiré des vraies statistiques', () => {
+    const ctx = newTestGame('NCE', 'FR', 'normal', 7);
+    const d = ctx.data;
+    // Boeing 2025 : A320 0,17 par million de vols, MD-11 3,41.
+    expect(baseHullLossRate(d.model('a320ceo'))).toBeCloseTo(0.17e-6, 12);
+    expect(baseHullLossRate(d.model('md11f'))).toBeGreaterThan(baseHullLossRate(d.model('b777f')));
+    expect(baseHullLossRate(d.model('atr72-600'))).toBeGreaterThan(baseHullLossRate(d.model('a320neo')));
+    act.orderAircraft(ctx, T0, 'a320neo', 1, 'NCE');
+    const ac = ctx.state.aircraft[0];
+    ac.builtAt = T0;
+    const pilot = (stars: number) => ({ stars }) as never;
+    const ok = crashRisk(d, ac, pilot(3), T0).p;
+    expect(crashRisk(d, ac, pilot(1), T0).p).toBeGreaterThan(ok * 2);
+    expect(crashRisk(d, ac, pilot(5), T0).p).toBeLessThan(ok);
+    ac.condition = 20;
+    expect(crashRisk(d, ac, pilot(3), T0).p).toBeGreaterThan(ok * 10);
+    expect(crashRisk(d, ac, pilot(3), T0, 'aucun').p).toBe(0);
+  });
+
+  it('un accident détruit l’avion et se retrouve dans les statistiques', () => {
+    const { ctx, t } = readyGame(7);
+    ctx.state.settings.crashFrequency = 'frequent';
+    const freq = CRASH_FREQUENCY as { frequent: number };
+    const before = freq.frequent;
+    freq.frequent = 1e9; // risque plafonné à 50 % par vol
+    try {
+      advance(ctx, t + 20 * DAY);
+    } finally {
+      freq.frequent = before;
+    }
+    const s = ctx.state;
+    expect(s.stats.crashes).toBeGreaterThan(0);
+    expect(s.crashes.length).toBe(s.stats.crashes);
+    const c = s.crashes[0];
+    expect(c.fatalities + c.injured).toBeLessThanOrEqual(c.pax + c.crew);
+    expect(s.log.some((e) => e.ref?.type === 'crash')).toBe(true);
   });
 });

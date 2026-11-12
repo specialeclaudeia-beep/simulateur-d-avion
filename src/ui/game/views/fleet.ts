@@ -8,14 +8,16 @@ import { DAY, MIN_STARS, USED_DELIVERY_HOURS, USED_MARKET_SIZE } from '../../../
 import { CATEGORY_LABEL, type AircraftModel } from '../../../game/data';
 import { YEAR, ageYears, aircraftValue, blockMinutes, pilotProblem, routeProblem } from '../../../game/economy';
 import { orderQuote } from '../../../game/fleet';
+import { crashRisk } from '../../../game/safety';
 import { maintenanceQuote, repairQuote } from '../../../game/sim';
 import type { Aircraft } from '../../../game/state';
 import { icon } from '../../icons';
-import { avatar, badge, bar, btn, dateLong, empty, esc, flagEmoji, kv, locked, money, note, num, pct, plural, quota, row, section, signedMoneyHtml, stars, when, withIcon } from '../dom';
+import { avatar, badge, bar, btn, dateLong, empty, esc, flagEmoji, kv, locked, money, note, num, num1, pct, plural, quota, row, section, signedMoneyHtml, stars, when, withIcon } from '../dom';
 import type { Ui, View } from '../ui';
 import { aircraftName, cityOf, pilotFullName, place, statusOf } from './common';
 import { openLineView } from './lines';
 import { hireView, trainNewView } from './pilots';
+import { oneInText } from './stats';
 
 // ───────────────────────── Outils ─────────────────────────
 
@@ -108,6 +110,20 @@ export function fleetView(ui: Ui): View {
 
 // ───────────────────────── Fiche d'un avion ─────────────────────────
 
+/** Risque d'accident de l'avion pour son prochain vol, et ce qui le fait monter. */
+function riskLine(ui: Ui, ac: Aircraft): string {
+  const s = ui.game.state;
+  if (s.settings.crashFrequency === 'aucun') return '';
+  const pilot = s.pilots.find((p) => p.id === ac.pilotId) ?? null;
+  const r = crashRisk(ui.game.data, ac, pilot, ui.now, s.settings.crashFrequency);
+  const why: string[] = [];
+  if (r.pilot > 1.2) why.push(pilot ? `pilote ${pilot.stars}\u202f★` : 'sans pilote attitré');
+  if (r.condition > 1.2) why.push(`état × ${num1(r.condition)}`);
+  if (r.age > 1.05) why.push('avion âgé');
+  if (r.cargo > 1) why.push('vol cargo');
+  return `<p class="g-small">Risque d’accident : <b>${esc(oneInText(r.p))}</b>${why.length ? ` (${esc(why.join(', '))})` : ''}</p>`;
+}
+
 export function aircraftView(ui: Ui, id: string): View {
   return {
     tab: 'fleet',
@@ -173,6 +189,7 @@ export function aircraftView(ui: Ui, id: string): View {
           <p class="g-title-line">${modelIcon(m)} <b>${esc(mfr?.name ?? '')} ${esc(m.name)}</b> · ${capacity(m)}</p>
           <p class="g-status-line">${badge(st.label, st.tone)} ${st.detail}</p>
           <p class="g-cond">État ${bar(ac.condition / 100)} <b>${Math.round(ac.condition)}\u202f%</b></p>
+          ${riskLine(ui, ac)}
           <div class="g-actions">${main.join('')}</div>
         </div>
         ${section('Pilote', pilotBlock)}

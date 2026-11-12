@@ -22,14 +22,18 @@ export interface AwaySummary {
   flights: number;
   cash: number;
   breakdowns: number;
+  crashes: number;
 }
 
 const TICK_MS = 250;
 const AUTOSAVE_MS = 20_000;
+/** Au-delà, l'onglet était sans doute en veille : on ne compte pas ce trou dans le temps de jeu. */
+const MAX_PLAY_STEP_MS = 2_000;
 
 export class Game {
   private ctx: Ctx | null = null;
   private tickListeners = new Set<Listener>();
+  private lastPlayTick = 0;
   private changeListeners = new Set<Listener>();
   private logListeners = new Set<LogListener>();
   private timer = 0;
@@ -75,6 +79,7 @@ export class Game {
   /** Nouvelle partie, au temps actuel de l'horloge. */
   newGame(params: NewGameParams): void {
     this.ctx = createNewGame(this.data, params, Math.round(this.clock.now()));
+    this.ctx.state.stats.startedReal = Date.now();
     this.afterStart();
     this.saveNow();
   }
@@ -98,6 +103,7 @@ export class Game {
         flights: s.stats.flights - before.flights,
         cash: s.cash - before.cash,
         breakdowns: newEntries.filter((e) => e.kind === 'bad' && e.text.startsWith('Panne')).length,
+        crashes: newEntries.filter((e) => e.ref?.type === 'crash').length,
       };
       this.ctx.fresh = [];
     }
@@ -159,14 +165,25 @@ export class Game {
     window.clearInterval(this.timer);
     this.timer = window.setInterval(() => this.tick(), TICK_MS);
     this.lastSave = performance.now();
+    this.lastPlayTick = 0;
     this.emitChange();
   }
 
   // ── Boucle ──
 
+  /** Temps réel de jeu : compté seulement quand la page est visible (pas en arrière-plan). */
+  private countPlayTime(ctx: Ctx): void {
+    const now = performance.now();
+    const last = this.lastPlayTick;
+    this.lastPlayTick = now;
+    if (!last || document.hidden) return;
+    ctx.state.stats.playMs += Math.min(now - last, MAX_PLAY_STEP_MS);
+  }
+
   private tick(): void {
     const ctx = this.ctx;
     if (!ctx) return;
+    this.countPlayTime(ctx);
     advance(ctx, this.clock.now());
     if (ctx.fresh.length) {
       const entries = ctx.fresh;

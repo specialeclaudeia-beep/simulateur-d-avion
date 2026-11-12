@@ -9,7 +9,7 @@
  * ajoute une étape dans `migrate()` pour convertir les anciennes parties :
  * une partie existante ne doit jamais être perdue.
  */
-import { DEFAULT_SETTINGS, SAVE_VERSION, type GameState, type Logo } from './state';
+import { DEFAULT_SETTINGS, SAVE_VERSION, newStats, type GameState, type GameStats, type LedgerKey, type Logo } from './state';
 
 const FORMAT = 'simulateur-compagnie-aerienne';
 
@@ -99,9 +99,43 @@ export function migrate(state: GameState, fromVersion: number): GameState {
   s.competition ??= true;
   s.rivalry ??= {};
   s.campaign ??= null;
+  s.stats = backfillStats(s);
+  s.crashes ??= [];
   s.version = SAVE_VERSION;
   return s;
 }
+
+/**
+ * Statistiques ajoutées après coup : pour une ancienne partie, on les
+ * reconstitue au mieux (comptes des mois gardés, flotte actuelle, distance).
+ */
+function backfillStats(s: GameState): GameStats {
+  const old = (s.stats ?? {}) as Partial<GameStats>;
+  const st: GameStats = { ...newStats(), ...old };
+  if (old.earned === undefined || old.spent === undefined) {
+    let earned = 0;
+    let spent = 0;
+    for (const month of [...(s.history ?? []), s.ledger].filter(Boolean)) {
+      for (const [key, v] of Object.entries(month.entries ?? {})) {
+        if (INCOME_KEYS.includes(key as LedgerKey)) earned += v ?? 0;
+        else spent += v ?? 0;
+      }
+    }
+    st.earned = Math.max(earned, st.revenue);
+    st.spent = spent;
+  }
+  if (old.hours === undefined) st.hours = st.km / AVERAGE_KMH;
+  if (old.bought === undefined) {
+    const fromMakers = Object.values(s.relations ?? {}).reduce((a, b) => a + b, 0);
+    st.bought = Math.max(fromMakers, s.aircraft?.length ?? 0);
+  }
+  return st;
+}
+
+/** Recettes dans les comptes du mois (le reste est dépensé). */
+const INCOME_KEYS: LedgerKey[] = ['tickets', 'cargo', 'assetSales'];
+/** Vitesse moyenne de bloc à bloc, pour estimer les heures de vol d'une ancienne partie. */
+const AVERAGE_KMH = 650;
 
 function storage(): Storage | null {
   try {
