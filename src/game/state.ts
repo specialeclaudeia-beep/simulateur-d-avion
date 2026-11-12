@@ -364,7 +364,7 @@ export interface GameState {
   nextDay: number;
   nextMonth: number;
   counters: { aircraft: number; pilot: number; line: number; listing: number; candidate: number; flight: number; lineNumber: number };
-  stats: { flights: number; pax: number; cargoT: number; km: number; revenue: number };
+  stats: GameStats;
   log: LogEntry[];
   settings: Settings;
   mode: GameMode;
@@ -374,6 +374,34 @@ export interface GameState {
   rivalry: Record<string, Rivalry>;
   /** Mode par échelons seulement. */
   campaign: Campaign | null;
+}
+
+/** Statistiques de la partie depuis sa création (écran « Statistiques »). */
+export interface GameStats {
+  flights: number;
+  pax: number;
+  cargoT: number;
+  km: number;
+  /** Recettes des vols (billets et fret). */
+  revenue: number;
+  /** Tout l'argent encaissé (vols, ventes d'avions et de hubs), hors emprunts. */
+  earned: number;
+  /** Tout l'argent dépensé (achats, frais, salaires, impôts…), hors remboursements d'emprunts. */
+  spent: number;
+  /** Heures de vol de toute la flotte. */
+  hours: number;
+  /** Avions achetés (neufs et d'occasion). */
+  bought: number;
+  /** Avions détruits dans un accident. */
+  crashes: number;
+  /** Temps réel passé à jouer (millisecondes, jeu ouvert et visible). */
+  playMs: number;
+  /** Heure réelle de création de la partie (absente pour les parties d'avant les statistiques). */
+  startedReal?: number;
+}
+
+export function newStats(now?: number): GameStats {
+  return { flights: 0, pax: 0, cargoT: 0, km: 0, revenue: 0, earned: 0, spent: 0, hours: 0, bought: 0, crashes: 0, playMs: 0, startedReal: now };
 }
 
 export const DEFAULT_SETTINGS: Settings = {

@@ -18,6 +18,8 @@ import {
   CHECK_HOURS_BASE,
   CHECK_HOURS_PER_POINT,
   COMPENSATION_PER_PAX,
+  CRASH_COMPENSATION_MULT,
+  CRASH_REPUTATION,
   DAY,
   HOUR,
   HUB_UPKEEP_PER_DAY,
@@ -43,6 +45,7 @@ import {
   aircraftValue,
   blockMinutes,
   breakdownChance,
+  crashChance,
   cargoCapOf,
   domesticVatRate,
   legCosts,
@@ -370,6 +373,7 @@ function arrive(ctx: Ctx, ac: Aircraft, t: number): void {
   s.stats.cargoT += leg.cargoT;
   s.stats.km += Math.round(data.distanceKm(leg.from, leg.to));
   s.stats.revenue += leg.revenue;
+  s.stats.hours += minutes / 60;
   s.ledger.flights++;
   s.ledger.pax += leg.pax;
   s.ledger.cargoT += leg.cargoT;
@@ -398,6 +402,10 @@ function arrive(ctx: Ctx, ac: Aircraft, t: number): void {
     }
   }
 
+  if (rng() < crashChance(ac.condition, pilot?.stars ?? 1)) {
+    crash(ctx, ac, leg.pax, t);
+    return;
+  }
   const baseLevel = s.hubs.find((h) => h.iata === ac.base)?.maintenance ?? 0;
   if (rng() < breakdownChance(ac.condition, pilot?.stars ?? 1, baseLevel)) {
     breakDown(ctx, ac, t);
@@ -405,6 +413,28 @@ function arrive(ctx: Ctx, ac: Aircraft, t: number): void {
   }
   ac.status = 'ground';
   ac.until = t + turnaroundMinutes(model) * 60_000;
+}
+
+/**
+ * Accident : l'avion est détruit à l'atterrissage (tout le monde est évacué).
+ * Il est rayé de la flotte, sans remboursement, et la réputation en souffre.
+ */
+function crash(ctx: Ctx, ac: Aircraft, pax: number, t: number): void {
+  const { state: s, data } = ctx;
+  const pilot = pilotOf(ctx, ac);
+  if (pilot) pilot.aircraftId = null;
+  s.aircraft = s.aircraft.filter((a) => a !== ac);
+  s.stats.crashes++;
+  spend(s, 'compensation', pax * COMPENSATION_PER_PAX * CRASH_COMPENSATION_MULT);
+  s.reputation = Math.max(0, s.reputation - CRASH_REPUTATION);
+  invalidate(ctx);
+  log(
+    ctx,
+    'bad',
+    `Accident : ${ac.registration} (${data.model(ac.modelId).name}) est détruit à l’atterrissage à ${cityOf(ctx, ac.location)}. Tout le monde a été évacué, mais l’avion est perdu.`,
+    undefined,
+    t,
+  );
 }
 
 function updateReputation(ctx: Ctx, ac: Aircraft, line: Line, load: number): void {

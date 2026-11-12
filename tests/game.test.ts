@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import * as act from '../src/game/actions';
 import { DAY, HOUR } from '../src/game/config';
-import { YEAR, marketValue } from '../src/game/economy';
+import { YEAR, crashChance, marketValue } from '../src/game/economy';
 import { generateUsedListings, orderQuote } from '../src/game/fleet';
 import { playerFlights, setFlightSource } from '../src/game/flights';
 import { upgradeInfo } from '../src/game/hubs';
@@ -387,5 +387,45 @@ describe('variété et trajectoires', () => {
     expect(gap).toBeLessThan(41);
     const start = interpolate(a, b, om, 0, [0, 0], lat);
     expect(distanceKm(start[0], start[1], 2.55, 49.01)).toBeLessThan(0.01);
+  });
+});
+
+describe('statistiques', () => {
+  it('comptent l’argent, les heures de vol et les avions achetés', () => {
+    const { ctx, t } = readyGame(7);
+    const s = ctx.state;
+    expect(s.stats.bought).toBeGreaterThan(0);
+    const cash0 = s.cash;
+    const earned0 = s.stats.earned;
+    const spent0 = s.stats.spent;
+    advance(ctx, t + 20 * DAY);
+    expect(s.stats.hours).toBeGreaterThan(0);
+    // Hors emprunts, la trésorerie bouge exactement de « encaissé − dépensé ».
+    expect(s.cash - cash0).toBeCloseTo(s.stats.earned - earned0 - (s.stats.spent - spent0), 2);
+  });
+
+  it('sont reconstituées pour une ancienne sauvegarde et survivent à l’export', () => {
+    const { ctx, t } = readyGame(7);
+    advance(ctx, t + 10 * DAY);
+    const old = JSON.parse(serialize(ctx.state));
+    const { flights, pax, cargoT, km, revenue } = old.state.stats;
+    old.state.stats = { flights, pax, cargoT, km, revenue };
+    const res = parseSave(JSON.stringify(old));
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    const st = res.save.state.stats;
+    expect(st.crashes).toBe(0);
+    expect(st.playMs).toBe(0);
+    expect(st.bought).toBeGreaterThanOrEqual(ctx.state.aircraft.length);
+    expect(st.earned).toBeGreaterThan(0);
+    expect(st.hours).toBeGreaterThan(0);
+    const again = parseSave(serialize(res.save.state));
+    expect(again.ok && again.save.state.stats).toEqual(st);
+  });
+
+  it('pas d’accident pour un avion bien entretenu', () => {
+    expect(crashChance(20, 1)).toBe(0);
+    expect(crashChance(60, 1)).toBe(0);
+    expect(crashChance(0, 1)).toBeGreaterThan(0);
   });
 });

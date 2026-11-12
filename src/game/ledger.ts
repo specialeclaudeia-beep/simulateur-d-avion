@@ -58,12 +58,14 @@ export function book(state: GameState, key: LedgerKey, amount: number): void {
 export function spend(state: GameState, key: LedgerKey, amount: number): void {
   if (!Number.isFinite(amount) || amount <= 0) return;
   state.cash -= amount;
+  state.stats.spent += amount;
   book(state, key, amount);
 }
 
 export function earn(state: GameState, key: LedgerKey, amount: number): void {
   if (!Number.isFinite(amount) || amount <= 0) return;
   state.cash += amount;
+  state.stats.earned += amount;
   book(state, key, amount);
 }
 
@@ -165,6 +167,7 @@ export function closeMonth(ctx: Ctx, t: number): void {
   const tax = taxable * rate;
   if (tax > 0) {
     s.cash -= tax;
+    s.stats.spent += tax;
     book(s, 'tax', tax);
   }
   s.ledger.cashEnd = s.cash;

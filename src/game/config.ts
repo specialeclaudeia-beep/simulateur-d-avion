@@ -151,6 +151,14 @@ export const WEAR_PER_CYCLE = 0.08;
 /** Probabilité de panne par vol : 0,06 % + 3 % × ((100 − état)/100)^3. */
 export const BREAKDOWN_BASE = 0.0006;
 export const BREAKDOWN_WEAR = 0.03;
+/**
+ * Accident (avion détruit) : seulement pour un avion très mal entretenu.
+ * Sous 20 % d'état, jusqu'à 0,3 % par vol à 0 % ; jamais au-dessus.
+ */
+export const CRASH_CONDITION = 20;
+export const CRASH_MAX = 0.003;
+export const CRASH_COMPENSATION_MULT = 4;
+export const CRASH_REPUTATION = 8;
 /** Part des pannes graves (sinon mineures). */
 export const BREAKDOWN_MAJOR_SHARE = 0.3;
 /** Réparations : durée (heures) et coût (part du prix catalogue). */

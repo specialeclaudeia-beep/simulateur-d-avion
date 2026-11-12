@@ -2299,3 +2299,61 @@ body.wizard-on .country-card {
     width: min(440px, calc(100% - min(340px, 44vw) - 24px));
   }
 }
+
+/* ── Statistiques ── */
+.g-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.g-stat {
+  --tone: var(--g-muted);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 2px 8px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--g-line);
+  border-left: 3px solid var(--tone);
+  border-radius: 12px;
+  background: var(--g-card);
+}
+
+.g-stat.accent { --tone: var(--g-accent); }
+.g-stat.good { --tone: var(--g-good); }
+.g-stat.bad { --tone: var(--g-bad); }
+.g-stat.info { --tone: var(--g-info); }
+
+.g-stat-icon {
+  display: grid;
+  place-items: center;
+  color: var(--tone);
+}
+
+.g-stat-label {
+  color: var(--g-muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.g-stat-value {
+  grid-column: 1 / -1;
+  font-family: var(--font-title);
+  font-size: 1.45rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.g-stat small {
+  grid-column: 1 / -1;
+  color: var(--g-muted);
+  font-size: 0.78rem;
+}
+
+.g-stat-balance {
+  margin-top: 8px;
+}

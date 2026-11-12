@@ -16,6 +16,7 @@ import { badge, btn, compact, dateLong, esc, flagEmoji, kv, money, num, row, sec
 import { logoHtml } from '../logo';
 import { copyText, downloadText, readImport } from '../saves';
 import type { Ui, View } from '../ui';
+import { playTime as statsPlayTime, statsView } from './stats';
 
 export interface CompanyHooks {
   /** Recommencer une partie dans le même mode (l'actuelle n'est remplacée qu'à la création de la nouvelle). */
@@ -114,7 +115,8 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
             ['Passagers transportés', num(s.stats.pax)],
             ['Distance parcourue', `${compact(s.stats.km)} km`],
             ['Recettes totales', money(s.stats.revenue)],
-          ]),
+          ]) +
+            `<div class="g-list">${row({ action: 'stats', icon: icon('chart', 22), title: 'Toutes les statistiques', sub: `Temps de jeu ${statsPlayTime(s.stats.playMs)} · ${num(s.stats.hours)} h de vol · ${num(s.stats.crashes)} crash${s.stats.crashes > 1 ? 's' : ''}` })}</div>`,
         )}
         ${section(
           'Classement mondial',
@@ -162,6 +164,7 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
       else if (a === 'copy') void copySaveCode(ui);
       else if (a === 'paste') void pasteSaveCode(ui, hooks);
       else if (a === 'goals') hooks.goals();
+      else if (a === 'stats') ui.push(statsView(ui));
       else if (a === 'settings') hooks.settings();
       else if (a === 'home') hooks.home();
       else if (a === 'install') {
