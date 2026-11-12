@@ -17,7 +17,7 @@ export interface HudHooks {
 export function mountHud(root: HTMLElement, clock: GameClock, map: MapLibreMap, hooks: HudHooks): void {
   root.innerHTML = `
     <div class="hud-bar">
-      <button class="hud-btn hud-menu" type="button" title="Menu" aria-label="Menu du jeu">${icon('menu', 20)}</button>
+      <button class="hud-btn hud-menu" type="button" data-key="back" title="Menu" aria-label="Menu du jeu">${icon('menu', 20)}</button>
       <div class="hud-time" title="Heure du jeu">
         <span class="hud-clock"><span class="hud-hm"></span><span class="hud-sec"></span></span>
         <span class="hud-sub">
@@ -29,7 +29,7 @@ export function mountHud(root: HTMLElement, clock: GameClock, map: MapLibreMap, 
       <div class="hud-speeds" role="group" aria-label="Vitesse du temps"><span class="hud-thumb" aria-hidden="true"></span></div>
       <div class="hud-tools">
         <button class="hud-btn hud-now" type="button" title="Rattraper l'heure réelle (le jeu est en retard)" aria-label="Rattraper l'heure réelle" hidden>${icon('now', 18)}<span>Maintenant</span></button>
-        <button class="hud-btn hud-globe" type="button" title="Voir le globe entier" aria-label="Voir le globe entier">${icon('globe', 20)}</button>
+        <button class="hud-btn hud-globe" type="button" data-key="globe" title="Voir le globe entier" aria-label="Voir le globe entier">${icon('globe', 20)}</button>
       </div>
     </div>
   `;
@@ -43,6 +43,7 @@ export function mountHud(root: HTMLElement, clock: GameClock, map: MapLibreMap, 
     b.innerHTML = s === 0 ? icon('pause', 18) : s === 1 ? `${icon('play', 12)}<span>×1</span>` : `<span>×${s >= 1000 ? `${s / 1000}k` : s}</span>`;
     b.title = s === 0 ? 'Pause' : `Vitesse ×${s}`;
     b.setAttribute('aria-label', b.title);
+    if (s === 0) b.dataset.key = 'pause';
     b.addEventListener('click', () => clock.setSpeed(s));
     speedsEl.appendChild(b);
     buttons.set(s, b);

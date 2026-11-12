@@ -9,6 +9,7 @@ export function mountSoundToggle(root: HTMLElement): void {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'hud-btn sound-toggle';
+  btn.dataset.key = 'mute';
   root.appendChild(btn);
 
   let shown: boolean | null = null;

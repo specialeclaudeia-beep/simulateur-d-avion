@@ -10,7 +10,7 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { music } from '../audio/music';
 import { SPEEDS, type GameClock, type Speed } from '../core/clock';
-import { normalizeKey, settings, type KeyAction } from '../core/settings';
+import { keyName, normalizeKey, settings, type KeyAction } from '../core/settings';
 import type { AircraftLayer } from '../map/aircraft';
 import type { Countries } from '../map/countries';
 import { START_CENTER, globeZoom } from '../map/createMap';
@@ -175,6 +175,18 @@ export function mountKeyboard(deps: KeyboardDeps): void {
         break;
     }
   };
+
+  // ── Bulles d'aide à la souris ──
+  // Les boutons marqués data-key rappellent leur raccourci au survol (« Flotte · touche F »).
+  // Calculé au survol : toujours à jour, même après un changement de touche.
+  document.addEventListener('pointerover', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    const el = (e.target as Element | null)?.closest?.<HTMLElement>('[data-key]');
+    if (!el) return;
+    const base = el.getAttribute('aria-label') ?? (el.dataset.tip ??= el.getAttribute('title') ?? '');
+    const key = settings.get().keys[el.dataset.key as KeyAction];
+    el.title = key ? `${base} · touche ${keyName(key)}` : base;
+  });
 
   // ── Écoute ──
   // En phase de capture : avant la fenêtre de confirmation (qui gère elle-même Échap et Entrée).
