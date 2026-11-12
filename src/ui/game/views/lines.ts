@@ -5,7 +5,7 @@
  */
 import * as act from '../../../game/actions';
 import { PERKS, limits } from '../../../game/campaign';
-import { demandContext, playerShare, presentRivals, rivalList, warOn } from '../../../game/competition';
+import { demandContext, playerShare, presentRivals, rivalList, STRATEGIES, warOn } from '../../../game/competition';
 import { PRICE_FACTOR_MAX, PRICE_FACTOR_MIN } from '../../../game/config';
 import type { Route } from '../../../game/data';
 import { domesticVatRate, playerPaxPerDay, referenceFare, routeProblem } from '../../../game/economy';
@@ -48,7 +48,7 @@ function competitors(ui: Ui, r: Route, max = 4): string {
   if (!present.length) return 'aucune compagnie';
   const names = present
     .slice(0, max)
-    .map((x) => `${esc(x.name)}${x.status === 'war' ? ` ${badge('guerre des prix', 'bad')}` : x.status === 'new' ? ` ${badge('nouvelle', 'warn')}` : ''}`);
+    .map((x) => `${esc(x.name)}${ui.game.state.rivals[x.code] ? ` <small>(${esc(STRATEGIES[ui.game.state.rivals[x.code].strategy].label.toLowerCase())})</small>` : ''}${x.status === 'war' ? ` ${badge('guerre des prix', 'bad')}` : x.status === 'new' ? ` ${badge('nouvelle', 'warn')}` : ''}`);
   return names.join(', ') + (present.length > max ? ` et ${plural(present.length - max, 'autre')}` : '');
 }
 
@@ -340,7 +340,7 @@ export function lineView(ui: Ui, id: string): View {
                  ['Compagnies sur la ligne', competitors(ui, route, 8)],
                  ...(gone.length ? ([['Ont abandonné', gone.map((x) => esc(x.name)).join(', ')]] as [string, string][]) : []),
                ])}
-               <p class="g-small">Une ligne bien remplie et sans rivale attire de nouvelles compagnies ; une compagnie appréciée et bien installée finit par les décourager.</p>`,
+               <p class="g-small">Les compagnies rivales réagissent à tes prix et à ta place sur la ligne, chacune selon sa politique : une ligne pleine et sans rivale attire du monde, une compagnie appréciée et bien installée finit par décourager les autres.</p>`,
             )
           : '';
       return `

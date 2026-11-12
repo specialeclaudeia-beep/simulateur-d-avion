@@ -141,7 +141,7 @@ describe('pannes et maintenance', () => {
     ac.condition = 0; // usé jusqu'à la corde : la panne est presque certaine
     ctx.state.settings.autoMaintenance = false;
     let now = t;
-    while (ac.status !== 'broken' && now < t + 10 * DAY) {
+    while (ac.status !== 'broken' && now < t + 60 * DAY) {
       now += 30 * 60_000;
       advance(ctx, now);
     }

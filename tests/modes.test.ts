@@ -23,7 +23,9 @@ import {
   progress,
 } from '../src/game/campaign';
 import { nextLevel, restartLevel } from '../src/game/campaignFlow';
-import { dailyCompetition, demandContext, presentRivals, rivalList, rivalsOn, warOn } from '../src/game/competition';
+import { dailyCompetition, demandContext, presentRivals, rivalCompanies, rivalList, rivalsOn, warOn } from '../src/game/competition';
+import { STRATEGIES } from '../src/game/rivalAI';
+import { GameData } from '../src/game/data';
 import { DAY, HOUR, TRAINING_DAYS } from '../src/game/config';
 import { makeCtx, type Ctx } from '../src/game/context';
 import { marketShare, playerPaxPerDay } from '../src/game/economy';
@@ -121,7 +123,9 @@ describe('concurrence', () => {
     const withRivals = flying(true);
     const alone = flying(false);
     const share = (g: ReturnType<typeof flying>) => marketShare(demandContext(g.ctx, g.ctx.state.lines[0], route, 90, 4, g.t));
-    expect(rivalsOn(withRivals.ctx.state, route, T0).pax).toBe(route.airlines.length);
+    const w = rivalsOn(withRivals.ctx.state, route, T0).pax;
+    expect(w).toBeGreaterThan(route.airlines.length * 0.8);
+    expect(w).toBeLessThan(route.airlines.length * 1.3);
     expect(rivalsOn(alone.ctx.state, route, T0).pax).toBeLessThan(0.5);
     expect(share(alone)).toBeGreaterThan(0.75);
     expect(share(alone)).toBeGreaterThan(share(withRivals) * 1.5);
@@ -142,8 +146,8 @@ describe('concurrence', () => {
       const route = data.route(line.hub, line.dest)!;
       const n = presentRivals(s, route).length;
       const w = rivalsOn(s, route, s.time).pax;
-      expect(w).toBeGreaterThanOrEqual(n);
-      expect(w).toBeLessThan(n + 1);
+      expect(w).toBeGreaterThan(n * 0.6);
+      expect(w).toBeLessThan(n * 2.2);
       for (const r of rivalList(ctx, route, s.time)) expect(r.name.length).toBeGreaterThan(0);
     }
     expect(Number.isFinite(s.cash)).toBe(true);
@@ -155,7 +159,8 @@ describe('concurrence', () => {
     ctx.rng = () => values[Math.min(i++, values.length - 1)];
   }
 
-  it('une guerre des prix prend des passagers au joueur, puis s’arrête', () => {
+  /** Partie installée sur Nice ⇄ Orly, rivales créées, et une seule rivale (présente sur la ligne) dont c'est le tour. */
+  function settled(strategy?: keyof typeof STRATEGIES) {
     const { ctx, t } = flying(true);
     const s = ctx.state;
     const data = realData();
@@ -163,57 +168,115 @@ describe('concurrence', () => {
     const route = data.route(line.hub, line.dest)!;
     advance(ctx, t + 12 * DAY); // la ligne s'installe
     expect(line.stats.flights).toBeGreaterThan(40);
-    s.rivalry = {}; // on repart d'une ligne où rien n'a encore bougé
+    s.rivalry = {};
     const now = s.time;
-    const before = playerPaxPerDay(demandContext(ctx, line, route, 90, 4, now));
-    rolls(ctx, 0.001, 0, 0.5);
-    dailyCompetition(ctx, now);
-    const war = warOn(s, route, now)!;
-    expect(war).not.toBeNull();
-    expect(route.airlines).toContain(war.airline);
-    expect(war.until - now).toBeGreaterThanOrEqual(14 * DAY);
-    expect(war.until - now).toBeLessThanOrEqual(35 * DAY);
-    expect(s.log[0].text).toMatch(/Guerre des prix/);
-    expect(playerPaxPerDay(demandContext(ctx, line, route, 90, 4, now))).toBeLessThan(before);
-    expect(rivalList(ctx, route, now).filter((r) => r.status === 'war')).toHaveLength(1);
-    // La guerre finie, tout redevient comme avant.
-    rolls(ctx, 0.9);
-    dailyCompetition(ctx, war.until + DAY);
-    expect(warOn(s, route, war.until + DAY)).toBeNull();
-    expect(s.log[0].text).toMatch(/arrête sa guerre des prix/);
-    expect(playerPaxPerDay(demandContext(ctx, line, route, 90, 4, war.until + DAY))).toBeCloseTo(before, 6);
-  });
+    // Une rivale pilotée dont le hub n'est pas sur la ligne (elle peut donc la quitter).
+    const code = presentRivals(s, route).find((c) => s.rivals[c] && ![route.a, route.b].includes(data.airlineByCode.get(c)!.hub))!;
+    expect(code).toBeTruthy();
+    for (const co of Object.values(s.rivals)) co.nextTurn = now + 1000 * DAY;
+    const co = s.rivals[code];
+    if (strategy) co.strategy = strategy;
+    co.nextTurn = now;
+    co.cash = 1; // pas de commande d'avion ce tour-ci
+    co.mood = 30;
+    return { ctx, s, line, route, co, now };
+  }
 
-  it('une rivale arrive sur une ligne presque sans concurrent, une autre renonce face à un joueur apprécié', () => {
+  it('les grandes compagnies autour du hub sont pilotées, chacune avec sa politique', () => {
     const { ctx, t } = flying(true);
     const s = ctx.state;
-    const data = realData();
-    const line = s.lines[0];
-    const route = data.route(line.hub, line.dest)!;
-    const key = `${[line.hub, line.dest].sort().join('-')}`;
-    advance(ctx, t + 12 * DAY);
-    const now = s.time;
-    expect(route.airlines.length).toBeGreaterThanOrEqual(2);
+    advance(ctx, t + 2 * DAY);
+    const list = rivalCompanies(ctx);
+    expect(list.length).toBeGreaterThanOrEqual(4);
+    expect(list.length).toBeLessThanOrEqual(12);
+    expect(list[0].lines).toBeGreaterThan(0); // la plus menaçante est sur la ligne du joueur
+    const codes = list.map((x) => x.co.code);
+    expect(codes).toContain('TO'); // la plus grande compagnie du pays
+    expect(s.rivals.U2.strategy).toBe('lowcost');
+    expect(s.rivals.BA.strategy).toBe('premium');
+    expect(new Set(list.map((x) => x.co.strategy)).size).toBeGreaterThanOrEqual(3);
+    for (const { co } of list) {
+      expect(co.fleet).toBeGreaterThanOrEqual(4);
+      expect(realData().modelById.has(co.model)).toBe(true);
+    }
+    expect(rivalCompanies(flying(false).ctx)).toEqual([]);
+  });
 
-    // Départ : deux rivales au moins, joueur apprécié et bien installé.
-    s.rivalry[key] = { entrants: [], gone: route.airlines.slice(2), war: null };
-    s.reputation = 85;
-    expect(presentRivals(s, route)).toHaveLength(2);
-    rolls(ctx, 0.03, 0);
+  it('une low-cost répond aux prix bas du joueur par une guerre des prix, puis remonte ses prix', () => {
+    const { ctx, s, line, route, co, now } = settled('lowcost');
+    line.priceFactor = 0.6;
+    const before = playerPaxPerDay(demandContext(ctx, line, route, 90, 4, now));
+    rolls(ctx, 0.5, 0);
     dailyCompetition(ctx, now);
-    expect(presentRivals(s, route)).toHaveLength(1);
+    const war = warOn(s, route, now)!;
+    expect(war.airline).toBe(co.code);
+    expect(war.until - now).toBeGreaterThanOrEqual(14 * DAY);
+    expect(war.until - now).toBeLessThanOrEqual(35 * DAY);
+    expect(s.log[0].text).toMatch(/Guerre des prix.*répond à tes prix bas/);
+    expect(playerPaxPerDay(demandContext(ctx, line, route, 90, 4, now))).toBeLessThan(before);
+    expect(rivalList(ctx, route, now).filter((r) => r.status === 'war')).toHaveLength(1);
+    expect(co.moves[0].text).toMatch(/guerre des prix/);
+    // La guerre finie, elle revient à ses prix habituels et souffle un moment.
+    co.nextTurn = war.until + DAY;
+    rolls(ctx, 0.5, 0.99);
+    dailyCompetition(ctx, war.until + DAY);
+    expect(warOn(s, route, war.until + DAY)).toBeNull();
+    expect(s.log.some((e) => /arrête sa guerre des prix/.test(e.text))).toBe(true);
+    expect(playerPaxPerDay(demandContext(ctx, line, route, 90, 4, war.until + DAY))).toBeCloseTo(before, 6);
+    expect(s.rivalry[GameData.routeKey(route.a, route.b)].truce!).toBeGreaterThan(war.until + 30 * DAY);
+  });
+
+  it('une compagnie premium ne suit pas les baisses de prix', () => {
+    const { ctx, s, line, route, now } = settled('premium');
+    line.priceFactor = 0.6;
+    rolls(ctx, 0.5, 0.2);
+    dailyCompetition(ctx, now);
+    expect(warOn(s, route, now)).toBeNull();
+  });
+
+  it('une rivale vient sur une ligne pleine et presque sans concurrent, une autre renonce face à un joueur apprécié', () => {
+    const { ctx, s, line, route, co, now } = settled('prudente');
+    const key = GameData.routeKey(route.a, route.b);
+    // Départ : deux rivales au moins, joueur apprécié, bien installé depuis des mois.
+    s.rivalry[key] = { entrants: [], gone: route.airlines.filter((c) => c !== co.code).slice(1), war: null };
+    expect(presentRivals(s, route)).toHaveLength(2);
+    s.reputation = 85;
+    line.openedAt = now - 200 * DAY;
+    rolls(ctx, 0.5, 0.99, 0);
+    dailyCompetition(ctx, now);
+    expect(presentRivals(s, route)).not.toContain(co.code);
     expect(s.log[0].text).toMatch(/abandonne la ligne/);
     expect(rivalList(ctx, route, now).some((r) => r.status === 'gone')).toBe(true);
 
-    // Arrivée : le joueur est presque seul et ses avions sont pleins.
-    line.month = { ...line.month, seats: 1000, pax: 900 };
-    rolls(ctx, 0.012, 0.3);
+    // Arrivée : une agressive d'ailleurs, le joueur presque seul et ses avions pleins.
+    const other = Object.values(s.rivals).find((c) => !presentRivals(s, route).includes(c.code) && !route.airlines.includes(c.code))!;
+    expect(other).toBeTruthy();
+    other.strategy = 'agressive';
+    other.nextTurn = now + DAY;
+    other.cash = 1;
+    other.mood = 30;
+    line.month = { ...line.month, seats: 1000, pax: 950 };
+    rolls(ctx, 0.5, 0);
     dailyCompetition(ctx, now + DAY);
-    expect(s.rivalry[key].entrants).toHaveLength(1);
-    expect(presentRivals(s, route)).toHaveLength(2);
+    expect(s.rivalry[key].entrants).toContain(other.code);
     expect(s.log[0].text).toMatch(/ouvre à son tour/);
-    expect(route.airlines).not.toContain(s.rivalry[key].entrants[0]);
     expect(rivalList(ctx, route, now + DAY).filter((r) => r.status === 'new')).toHaveLength(1);
+  });
+
+  it('les rivales gèrent leur argent et leur flotte sur la durée', () => {
+    const { ctx, t } = flying(true, 9);
+    const s = ctx.state;
+    advance(ctx, t + 400 * DAY);
+    const list = rivalCompanies(ctx);
+    expect(list.some(({ co }) => co.fleet !== co.fleet0)).toBe(true);
+    for (const { co } of list) {
+      expect(Number.isFinite(co.cash)).toBe(true);
+      expect(co.fleet).toBeGreaterThanOrEqual(4);
+      expect(co.moves.length).toBeLessThanOrEqual(6);
+    }
+    // Une partie sauvegardée garde ses rivales.
+    const again = parseSave(serialize(s));
+    expect(again.ok && again.save.state.rivals).toEqual(s.rivals);
   });
 
   it('sans concurrence, rien ne bouge sur les lignes', () => {

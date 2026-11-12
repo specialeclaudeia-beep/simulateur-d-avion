@@ -32,6 +32,36 @@ export interface Rivalry {
   gone: string[];
   /** Guerre des prix en cours : qui la mène et jusqu'à quand. */
   war: { airline: string; until: number } | null;
+  /** Prix pratiqué par chaque rivale sur la ligne (1 = prix de référence), quand il diffère de sa politique habituelle. */
+  fares?: Record<string, number>;
+  /** Pas de nouvelle guerre des prix avant cette date (les rivales soufflent après une guerre). */
+  truce?: number;
+}
+
+/** Politique commerciale d'une compagnie rivale (voir rivalAI.ts). */
+export type RivalStrategy = 'lowcost' | 'premium' | 'agressive' | 'prudente' | 'expansion';
+
+/** Une compagnie rivale pilotée par l'ordinateur (mode « avec concurrence »). */
+export interface RivalCo {
+  /** Code IATA de la vraie compagnie. */
+  code: string;
+  strategy: RivalStrategy;
+  cash: number;
+  fleet: number;
+  /** Flotte au début de la partie (sa force face au joueur suit sa croissance). */
+  fleet0: number;
+  /** Avion qu'elle commande (identifiant de modèle). */
+  model: string;
+  /** Bases ouvertes pendant la partie, en plus de son hub d'origine. */
+  bases: string[];
+  /** Hostilité envers le joueur (0 à 100) : monte quand il vient sur ses lignes. */
+  mood: number;
+  /** Résultat de sa dernière semaine (estimation). */
+  weekProfit: number;
+  /** Prochaine décision (temps de jeu). */
+  nextTurn: number;
+  /** Ses dernières décisions, de la plus récente à la plus ancienne. */
+  moves: { t: number; text: string }[];
 }
 
 /** Améliorations à choisir entre deux échelons (voir campaign.ts). */
@@ -406,6 +436,8 @@ export interface GameState {
   competition: boolean;
   /** Évolution de la concurrence, par ligne (clé GameData.routeKey). */
   rivalry: Record<string, Rivalry>;
+  /** Les compagnies rivales pilotées par l'ordinateur, par code IATA (vide sans concurrence). */
+  rivals: Record<string, RivalCo>;
   /** Mode par échelons seulement. */
   campaign: Campaign | null;
 }
