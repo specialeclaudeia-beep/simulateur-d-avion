@@ -9,6 +9,7 @@ export function mountTrafficToggle(root: HTMLElement, layer: AircraftLayer): voi
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'hud-btn traffic-toggle active';
+  btn.dataset.key = 'traffic';
   btn.title = 'Afficher ou masquer le trafic aérien réel';
   btn.setAttribute('aria-pressed', 'true');
   btn.innerHTML = `${icon('plane', 16)}<span></span>`;

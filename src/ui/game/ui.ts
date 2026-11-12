@@ -94,10 +94,10 @@ export class Ui {
     this.nav.className = 'g-nav';
     this.nav.hidden = true;
     this.nav.innerHTML = `
-      <button type="button" class="g-nav-company" data-tab="company" aria-label="Ma compagnie">
+      <button type="button" class="g-nav-company" data-tab="company" data-key="company" aria-label="Ma compagnie">
         <span class="g-nav-logo"></span><span class="g-nav-cash"></span>
       </button>
-      ${TABS.map((t) => `<button type="button" class="g-tab" data-tab="${t.id}"><span class="g-tab-icon">${icon(t.icon, 22)}</span><small>${t.label}</small><i class="g-dot" hidden></i></button>`).join('')}
+      ${TABS.map((t) => `<button type="button" class="g-tab" data-tab="${t.id}" data-key="${t.id}" aria-label="${t.label}"><span class="g-tab-icon">${icon(t.icon, 22)}</span><small>${t.label}</small><i class="g-dot" hidden></i></button>`).join('')}
     `;
     this.cashEl = this.nav.querySelector('.g-nav-cash')!;
     this.logoEl = this.nav.querySelector('.g-nav-logo')!;

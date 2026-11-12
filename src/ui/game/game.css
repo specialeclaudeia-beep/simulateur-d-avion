@@ -7,6 +7,7 @@
 :root {
   --nav-h: 60px;
   --hud-h: 64px; /* mesurée par le jeu */
+  --panel-w: 420px; /* panneau de droite sur ordinateur */
   --g-bg: rgba(7, 11, 20, 0.96);
   --g-card: rgba(255, 255, 255, 0.045);
   --g-line: var(--line);
@@ -1563,7 +1564,7 @@ body.wizard-on .country-card {
     right: 12px;
     top: calc(var(--hud-h) + 8px);
     bottom: calc(var(--nav-h) + 24px);
-    width: 420px;
+    width: var(--panel-w);
     height: auto;
     border-bottom: 1px solid var(--g-line);
     border-radius: 16px;
@@ -1590,23 +1591,23 @@ body.wizard-on .country-card {
   body.sheet-open .flight-card,
   body.sheet-open .country-card,
   body.wizard-on .flight-card {
-    left: calc((100% - 444px) / 2);
+    left: calc((100% - var(--panel-w) - 24px) / 2);
   }
 
   body.sheet-open .maplibregl-ctrl-bottom-right,
   body.wizard-on .maplibregl-ctrl-bottom-right {
-    right: 444px;
+    right: calc(var(--panel-w) + 24px);
   }
 
   body.sheet-open .g-toasts,
   body.wizard-on .g-toasts {
-    left: calc((100% - 444px) / 2);
+    left: calc((100% - var(--panel-w) - 24px) / 2);
   }
 
   /* Le compteur d'images par seconde reste sur la carte, à gauche du panneau. */
   body.sheet-open .fps-counter,
   body.wizard-on .fps-counter {
-    right: 444px;
+    right: calc(var(--panel-w) + 24px);
   }
 }
 
@@ -2565,3 +2566,74 @@ body.wizard-on .country-card {
 .g-lb-who b, .g-lb-who small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .g-lb-who small { opacity: 0.75; }
 .g-lb-score { font-weight: 700; white-space: nowrap; }
+
+/* ───────────── Grand écran d'ordinateur ─────────────
+ * Le panneau de droite s'élargit et le texte grossit un peu : à 1440 px et
+ * plus, une colonne de 420 px paraissait étroite et serrée.
+ */
+
+@media (min-width: 1400px) and (min-height: 760px) {
+  :root {
+    --panel-w: 470px;
+  }
+
+  .g-sheet {
+    font-size: 15.5px;
+  }
+}
+
+@media (min-width: 1800px) and (min-height: 900px) {
+  :root {
+    --panel-w: 540px;
+    --nav-h: 66px;
+  }
+
+  .g-sheet {
+    font-size: 16px;
+  }
+}
+
+/* À la souris : les lignes et les onglets réagissent au survol. */
+@media (hover: hover) and (pointer: fine) {
+  .g-tab:hover,
+  .g-nav-company:hover {
+    color: var(--g-fg);
+    background: rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* ───────────── Tablette tenue droite ─────────────
+ * Entre le téléphone et l'ordinateur : la feuille monte du bas comme sur
+ * téléphone, mais centrée et moins large (sur 800 px, des lignes étirées d'un
+ * bord à l'autre se lisaient mal), et les onglets restent groupés au centre.
+ */
+
+@media (min-width: 600px) and (max-width: 899px) and (orientation: portrait) {
+  :root {
+    --nav-h: 66px;
+  }
+
+  .g-nav {
+    grid-template-columns: auto repeat(5, minmax(0, 104px));
+    justify-content: center;
+  }
+
+  .g-nav-company {
+    padding: 0 14px 0 10px;
+  }
+
+  .g-tab small {
+    font-size: 12px;
+  }
+
+  .g-sheet,
+  .g-sheet.expanded {
+    left: max(12px, calc((100% - 700px) / 2));
+    right: max(12px, calc((100% - 700px) / 2));
+    font-size: 16px;
+  }
+
+  .g-sheet:not(.g-wizard, .expanded) {
+    height: min(58vh, calc(100dvh - var(--hud-h) - var(--nav-h) - 16px));
+  }
+}
