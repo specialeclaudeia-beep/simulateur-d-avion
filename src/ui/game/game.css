@@ -2536,3 +2536,32 @@ body.wizard-on .country-card {
 .g-rival-moves li {
   grid-template-columns: 1fr auto;
 }
+
+/* Classement en ligne */
+.g-lb-tabs { flex-wrap: wrap; }
+.g-lb {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.g-lb-row {
+  display: grid;
+  grid-template-columns: 2em 10px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.g-lb-row.mine {
+  outline: 1px solid var(--accent, #ffb627);
+  background: rgba(255, 182, 39, 0.1);
+}
+.g-lb-rank { text-align: center; font-weight: 700; }
+.g-lb-dot { width: 10px; height: 10px; border-radius: 50%; }
+.g-lb-who { min-width: 0; }
+.g-lb-who b, .g-lb-who small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-lb-who small { opacity: 0.75; }
+.g-lb-score { font-weight: 700; white-space: nowrap; }
