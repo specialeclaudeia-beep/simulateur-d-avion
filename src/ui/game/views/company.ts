@@ -18,6 +18,8 @@ import { badge, btn, compact, dateLong, esc, flagEmoji, kv, money, num, row, sec
 import { logoHtml } from '../logo';
 import { copyText, downloadText, readImport } from '../saves';
 import type { Ui, View } from '../ui';
+import { leaderboard } from '../../../core/leaderboard';
+import { leaderboardView } from './leaderboard';
 import { rivalsView } from './rivals';
 import { playTime as statsPlayTime, statsView } from './stats';
 
@@ -144,7 +146,7 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
         ${rivalsSection(ui)}
         ${section(
           'Classement mondial',
-          `<p>Avec <b>${s.lines.length}</b> ${s.lines.length > 1 ? 'lignes' : 'ligne'}, ta compagnie serait <b>${num(r.rank)}<sup>e</sup></b> sur ${num(r.total)} compagnies réelles${r.neighbour ? `, juste derrière ${esc(r.neighbour)}` : ' : la première du monde !'}.</p>`,
+          `<div class="g-list">${row({ action: 'leaderboard', icon: icon('trophy', 22), title: 'Classement en ligne', sub: leaderboard.joined ? 'Compare-toi à tes amis' : 'Rejoins le classement des joueurs' })}</div><p>Avec <b>${s.lines.length}</b> ${s.lines.length > 1 ? 'lignes' : 'ligne'}, ta compagnie serait <b>${num(r.rank)}<sup>e</sup></b> sur ${num(r.total)} compagnies réelles${r.neighbour ? `, juste derrière ${esc(r.neighbour)}` : ' : la première du monde !'}.</p>`,
         )}
         ${section(
           'Réglages de la partie',
@@ -201,6 +203,7 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
       else if (a === 'goals') hooks.goals();
       else if (a === 'stats') ui.push(statsView(ui));
       else if (a === 'rivals') ui.push(rivalsView(ui));
+      else if (a === 'leaderboard') ui.push(leaderboardView(ui));
       else if (a === 'settings') hooks.settings();
       else if (a === 'home') hooks.home();
       else if (a === 'install') {

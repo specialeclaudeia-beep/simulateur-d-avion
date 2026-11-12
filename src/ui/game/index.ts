@@ -14,6 +14,7 @@ import './game.css';
 import '../screens.css';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import type { GameClock } from '../../core/clock';
+import { leaderboard } from '../../core/leaderboard';
 import { profile } from '../../core/profile';
 import { keyName, settings } from '../../core/settings';
 import { goalsReached, picksAllowed } from '../../game/campaign';
@@ -33,6 +34,7 @@ import { closeSettings, openSettings } from '../settingsScreen';
 import { esc, money, plural } from './dom';
 import { logoHtml } from './logo';
 import { modeLabel } from './saves';
+import { scoreSnapshot } from './views/leaderboard';
 import { showCrash } from './views/stats';
 import { Ui, sidePanel, type View } from './ui';
 import { campaignView, levelIntro, type CampaignHooks } from './views/campaign';
@@ -196,6 +198,7 @@ export async function mountGame(deps: GameDeps): Promise<GameApp> {
     closeSettings();
     if (game.started) {
       game.saveNow();
+      leaderboard.offer(scoreSnapshot(ui), true);
       game.quit();
     }
     ui.stop();
@@ -394,6 +397,11 @@ export async function mountGame(deps: GameDeps): Promise<GameApp> {
     // Onglet caché ou appareil en veille : ce temps-là ne compte pas.
     if (screen === 'game' && game.started && !document.hidden && dt < 3 * PLAY_TICK_MS) profile.addPlay(dt);
   }, PLAY_TICK_MS);
+
+  // ── Classement en ligne : un envoi toutes les 5 minutes au plus (rien sans réseau ni sans inscription) ──
+  window.setInterval(() => {
+    if (screen === 'game' && game.started && leaderboard.joined && !game.state.bankrupt) leaderboard.offer(scoreSnapshot(ui));
+  }, 60_000);
 
   // ── Clavier ──
   mountKeyboard({
