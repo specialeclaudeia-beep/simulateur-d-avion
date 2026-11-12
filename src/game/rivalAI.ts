@@ -219,7 +219,17 @@ function rosterCodes(ctx: Ctx): string[] {
 export function refreshRoster(ctx: Ctx, t: number): void {
   const s = ctx.state;
   const codes = rosterCodes(ctx);
-  // Une rivale déjà en jeu garde son histoire, même si elle n'est plus parmi les plus présentes.
+  // Une rivale déjà en jeu garde son histoire tant qu'elle compte encore pour le joueur
+  // (parmi les plus présentes, ou sur une de ses lignes). Les autres laissent la place :
+  // sinon, après un changement de hub ou de pays, plus aucune rivale locale ne serait créée.
+  const keep = new Set(codes);
+  for (const line of s.lines) {
+    const route = ctx.data.route(line.hub, line.dest);
+    if (!route) continue;
+    for (const code of route.airlines) keep.add(code);
+    for (const code of rivalryOf(s, route)?.entrants ?? []) keep.add(code);
+  }
+  for (const code of Object.keys(s.rivals)) if (!keep.has(code)) delete s.rivals[code];
   for (const code of codes) {
     if (Object.keys(s.rivals).length >= ROSTER_MAX + 4) break;
     if (!s.rivals[code]) {
@@ -472,7 +482,7 @@ function attack(ctx: Ctx, co: RivalCo, t: number, lines: LineSituation[]): boole
 export function rivalsDay(ctx: Ctx, t: number, present: Present, demand: Context): void {
   const s = ctx.state;
   const hubsKey = s.hubs.map((h) => h.iata).join(',');
-  if (rosterKey.get(s) !== hubsKey) {
+  if (rosterKey.get(s) !== hubsKey || !Object.keys(s.rivals).length) {
     refreshRoster(ctx, t);
     rosterKey.set(s, hubsKey);
   }

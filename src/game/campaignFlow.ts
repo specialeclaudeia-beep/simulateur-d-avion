@@ -64,8 +64,11 @@ function settle(ctx: Ctx, t: number, level: number, country: string, hub: string
   s.negativeSince = null;
   s.bankrupt = false;
   // La réputation ne voyage qu'à moitié : dans un nouveau pays, tout est à refaire.
-  s.reputation = 50 + (s.reputation - 50) / 2;
+  // Elle reste sous l'objectif de satisfaction du nouvel échelon : sinon il serait atteint dès l'arrivée, sans un seul vol.
+  s.reputation = Math.min(50 + (s.reputation - 50) / 2, levelSpec(level).satisfaction - 10);
   s.rivalry = {};
+  // Les rivales du pays précédent restent là-bas : celles du nouveau pays seront créées au premier jour.
+  s.rivals = {};
 
   c.level = level;
   c.reached = { airports: false, satisfaction: false, profit: false };
