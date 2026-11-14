@@ -4,6 +4,9 @@
  * - Touches, onglets, panneaux, fenêtres, interrupteurs, curseurs, défilement,
  *   messages (réussite, argent, erreur, panne, actualité), contrats signés,
  *   vitesse du temps, carte (avion touché, déplacement, zoom, trafic).
+ * - Accueil : touches du menu, lancement d'une partie, fenêtre des paramètres,
+ *   ambiance de bord de piste.
+ * - Modes : échelon franchi, objectif atteint, amélioration, concurrents, faillite.
  * - Ambiance selon l'onglet ouvert : aérogare dans Hubs, hangar dans Flotte,
  *   bureau dans Ma compagnie, Pilotes, Lignes et Finances.
  *
@@ -46,6 +49,14 @@ const SCENES: Record<string, Scene> = {
       [['hydraulic_pump', 0, 0.5]], [['cargo_door', 0, 0.6]], [['tug_horn', 0, 0.4]],
     ],
   },
+  /** Page d'accueil : le bord des pistes au loin, des annonces, la radio. */
+  home: {
+    loops: { apron_ambience: 0.35, wind_external: 0.2 },
+    random: [
+      [['pa_chime', 0, 0.35]], [['distant_chime', 0, 0.4]], [['radio_squelch', 0, 0.25]], [['birds_dawn', 0, 0.3]],
+      [['tug_horn', 0, 0.2]], [['bird_chirp', 0, 0.3]],
+    ],
+  },
   office: {
     loops: { office_ambience: 0.7 },
     random: [
@@ -65,13 +76,21 @@ const SCENE_OF_TAB: Record<string, string> = {
 
 /** Message → son. Le premier motif qui correspond l'emporte. */
 const TOAST_SOUNDS: [RegExp, string, Cue[]][] = [
-  [/est née/, 'good', [['ui_swoosh_long', 0, 0.8], ['ui_launch', 0.3, 1], ['fanfare_success', 1.2, 0.8]]],
+  [/Tu as gravi tous les échelons/, 'good', [['ui_swoosh_long', 0, 0.8], ['fanfare_success', 0.4, 1], ['boarding_chime', 2.6, 0.7]]],
+  [/^Échelon \d/, 'good', [['ui_unlock', 0, 0.9], ['fanfare_success', 0.5, 0.8]]],
+  [/Objectif atteint/, 'good', [['ui_timer_end', 0, 0.8], ['ui_unlock', 0.5, 0.8]]],
+  [/Amélioration obtenue/, 'good', [['ui_unlock', 0, 0.8], ['ui_coins', 0.4, 0.7]]],
+  [/passe pilote \d/, 'good', [['ui_unlock', 0, 0.7], ['pa_chime', 0.4, 0.6]]],
+  [/abandonne la ligne|arrête sa guerre/, 'good', [['ui_confirm', 0, 0.8], ['ui_cash_plus', 0.3, 0.7]]],
+  [/est (née|créée)/, 'good', [['ui_swoosh_long', 0, 0.8], ['ui_launch', 0.3, 1], ['fanfare_success', 1.2, 0.8]]],
   [/contrat|commande/i, 'good', [['contract_stamp', 0, 0.9], ['ui_coins', 0.6, 0.8]]],
   [/livr|arriv/i, 'good', [['ui_timer_end', 0, 0.8]]],
   [/hub/i, 'good', [['ui_unlock', 0, 0.9], ['cash_register', 0.5, 0.6]]],
   [/achet|recrut|form/i, 'good', [['ui_coins', 0, 0.9]]],
   [/sauvegarde|code copié|fichier/i, 'good', [['ui_save', 0, 0.9]]],
   [/panne/i, 'bad', [['master_caution', 0, 0.8]]],
+  [/Faillite/, 'bad', [['master_warning', 0, 0.6], ['ui_cash_minus', 0.8, 0.8]]],
+  [/guerre des prix|ouvre à son tour|concurren/i, 'bad', [['news_flash', 0, 0.7], ['ui_alert_soft', 0.5, 0.7]]],
 ];
 
 const THROTTLE_MS: Record<string, number> = { ui_hover: 90, ui_dial_tick: 60, ui_scroll_tick: 120, cash: 4000 };
@@ -111,7 +130,14 @@ export function mountUiSounds(map: MapLibreMap, aircraft: AircraftLayer): void {
       const el = (e.target as HTMLElement).closest<HTMLElement>('button, .g-row, label.g-btn');
       if (!el || (el as HTMLButtonElement).disabled) return;
       const a = el.dataset.a;
-      if (el.matches('.g-back')) ui('ui_back');
+      const h = el.dataset.h;
+      if (h === 'resume' || h === 'new') cues([['ui_launch', 0, 0.9], ['engine_spool_up', 0.2, 0.25]]);
+      else if (h === 'back' || el.matches('.g-back')) ui('ui_back');
+      else if (el.matches('.home-btn')) ui('ui_swoosh_long', 0.7);
+      else if (h === 'account') ui('ui_panel_open', 0.7);
+      else if (h === 'install') ui('ui_save');
+      else if (el.matches('.set-key')) ui('knob_detent');
+      else if (el.dataset.s === 'next') ui('ui_progress', 0.8);
       else if (el.matches('.g-tab, .g-nav-company')) ui('ui_tab_switch');
       else if (el.matches('.g-row')) ui('ui_page_turn');
       else if (el.matches('.hud-speed')) ui(el.matches('.hud-pause') ? 'clock_tick' : 'ui_progress', 0.8);
@@ -170,11 +196,12 @@ export function mountUiSounds(map: MapLibreMap, aircraft: AircraftLayer): void {
         continue;
       }
       for (const n of r.removedNodes) {
-        if (n instanceof HTMLElement && n.classList.contains('g-modal-back')) ui('ui_modal_close', 0.7);
+        if (n instanceof HTMLElement && (n.classList.contains('g-modal-back') || n.classList.contains('ov'))) ui('ui_modal_close', 0.7);
       }
       for (const n of r.addedNodes) {
         if (!(n instanceof HTMLElement)) continue;
         if (n.classList.contains('g-toast')) toastSound(n);
+        else if (n.classList.contains('ov')) ui('ui_modal_open', 0.8);
         else if (n.classList.contains('g-modal-back')) {
           const text = n.textContent ?? '';
           if (/Pendant ton absence/.test(text)) cues([['alarm_clock', 0, 0.6], ['ui_modal_open', 0.2, 0.8]]);
@@ -225,7 +252,8 @@ export function mountUiSounds(map: MapLibreMap, aircraft: AircraftLayer): void {
   setInterval(() => {
     if (!audio() || !sceneBus) return;
     const tab = document.querySelector<HTMLElement>('.g-nav [data-tab].active')?.dataset.tab;
-    const want = music.uiOn && document.body.classList.contains('sheet-open') && tab ? (SCENE_OF_TAB[tab] ?? null) : null;
+    const home = document.body.classList.contains('home-on');
+    const want = !music.uiOn ? null : home ? 'home' : document.body.classList.contains('sheet-open') && tab ? (SCENE_OF_TAB[tab] ?? null) : null;
     if (want !== current) {
       current = want;
       scene.set(want ? SCENES[want].loops : {}, 1.5);
