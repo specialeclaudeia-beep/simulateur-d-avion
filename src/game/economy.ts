@@ -157,6 +157,12 @@ export function frequencyFactor(legsPerDay: number): number {
   return 0.85 + 0.15 * Math.min(4, Math.max(1, legsPerDay));
 }
 
+/** Poids des concurrents face au joueur sur une ligne (1 = une compagnie moyenne). Voir competition.ts. */
+export interface Rivals {
+  pax: number;
+  cargo: number;
+}
+
 export interface DemandContext {
   route: Route;
   line: Line;
@@ -164,6 +170,7 @@ export interface DemandContext {
   reputation: number;
   condition: number;
   legsPerDay: number;
+  rivals: Rivals;
 }
 
 /** Attrait de la compagnie du joueur sur une ligne (≈ 1 = comme un concurrent moyen). */
@@ -175,19 +182,21 @@ export function attractiveness(ctx: DemandContext): number {
   return HOME_HUB_BONUS * rep * quality * comfort * price * frequencyFactor(ctx.legsPerDay);
 }
 
+/** Part des passagers de la ligne qui choisissent le joueur (0 à 1). */
+export function marketShare(ctx: DemandContext): number {
+  const A = attractiveness(ctx);
+  return A / (A + ctx.rivals.pax * COMPETITOR_STRENGTH);
+}
+
 /** Passagers par jour et par sens que le joueur peut espérer sur la ligne, tous ses vols confondus. */
 export function playerPaxPerDay(ctx: DemandContext): number {
-  const A = attractiveness(ctx);
-  const n = ctx.route.airlines.length * COMPETITOR_STRENGTH;
-  const share = A / (A + n);
-  return ctx.route.demand * ctx.line.priceFactor ** -PRICE_ELASTICITY_MARKET * share;
+  return ctx.route.demand * ctx.line.priceFactor ** -PRICE_ELASTICITY_MARKET * marketShare(ctx);
 }
 
 /** Tonnes de fret par jour et par sens pour le joueur. */
 export function playerCargoPerDay(ctx: DemandContext): number {
   const A = HOME_HUB_BONUS * ctx.line.priceFactor ** -PRICE_ELASTICITY_SHARE * frequencyFactor(ctx.legsPerDay);
-  const n = Math.floor(ctx.route.airlines.length / 3) * COMPETITOR_STRENGTH;
-  const share = A / (A + n);
+  const share = A / (A + ctx.rivals.cargo * COMPETITOR_STRENGTH);
   return ctx.route.demand * CARGO_T_PER_PAX * ctx.line.priceFactor ** -PRICE_ELASTICITY_MARKET * share;
 }
 

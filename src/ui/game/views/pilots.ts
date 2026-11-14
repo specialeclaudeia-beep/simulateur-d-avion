@@ -3,11 +3,13 @@
  * recrutement de pilotes expérimentés et formation de débutants.
  */
 import * as act from '../../../game/actions';
-import { PILOT_SEVERANCE_MONTHS, PILOT_SIGNING_MONTHS, TRAINING_DAYS } from '../../../game/config';
+import { PERKS, limits } from '../../../game/campaign';
+import { PILOT_SEVERANCE_MONTHS, PILOT_SIGNING_MONTHS } from '../../../game/config';
 import { pilotProblem } from '../../../game/economy';
-import { familyMinStars, trainingCost, typeRatingSpec } from '../../../game/pilots';
+import { familyMinStars, initialTraining, typeRatingSpec } from '../../../game/pilots';
 import type { Pilot } from '../../../game/state';
-import { avatar, badge, btn, dateLong, empty, esc, kv, money, note, num, num1, row, section, stars, when } from '../dom';
+import { icon } from '../../icons';
+import { avatar, badge, btn, dateLong, empty, esc, kv, locked, money, note, num, num1, plural, row, section, stars, when, withIcon } from '../dom';
 import type { Ui, View } from '../ui';
 import { aircraftName, pilotFullName } from './common';
 import { aircraftView } from './fleet';
@@ -20,6 +22,14 @@ function findPilot(ui: Ui, id: string): Pilot | undefined {
 function fleetFamilies(ui: Ui): Set<string> {
   return new Set(ui.game.state.aircraft.map((a) => ui.game.data.model(a.modelId).family));
 }
+
+/** Mode par échelons : peut-on embaucher des pilotes expérimentés ? (Toujours, en partie libre.) */
+function canRecruit(ui: Ui): boolean {
+  const lim = limits(ui.game.state);
+  return !lim || lim.recruit;
+}
+
+const RECRUIT_LOCKED = `Le recrutement de pilotes expérimentés se débloque avec l’amélioration « ${PERKS.recruit.title} », à choisir en changeant d’échelon. En attendant, forme tes pilotes : en mode par échelons, la formation est deux fois plus rapide.`;
 
 function pilotStatus(ui: Ui, p: Pilot): string {
   const now = ui.now;
@@ -40,11 +50,19 @@ export function pilotsView(ui: Ui): View {
     title: () => 'Pilotes',
     render() {
       const s = ui.game.state;
-      const actions = `<div class="g-actions">${btn('🤝 Recruter', 'hire')}${btn('🎓 Former un débutant', 'train', { cls: 'ghost' })}</div>`;
+      const recruit = canRecruit(ui);
+      const days = initialTraining(ui.game.data, s).days;
+      const actions = recruit
+        ? `<div class="g-actions">${btn(withIcon('userPlus', 'Recruter'), 'hire')}${btn(withIcon('school', 'Former un débutant'), 'train', { cls: 'ghost' })}</div>`
+        : `<div class="g-actions">${btn(withIcon('school', 'Former un débutant'), 'train')}</div>${locked(RECRUIT_LOCKED)}`;
       if (!s.pilots.length) {
         return (
           actions +
-          empty('Aucun pilote. Recrute un pilote expérimenté (prêt tout de suite) ou forme un débutant (moins cher, mais 20 jours de formation).')
+          empty(
+            recruit
+              ? `Aucun pilote. Recrute un pilote expérimenté (prêt tout de suite) ou forme un débutant (moins cher, mais ${days} jours de formation).`
+              : `Aucun pilote pour l’instant. Ton premier pilote, déjà qualifié, arrive avec ton premier avion. Les suivants se forment en ${days} jours.`,
+          )
         );
       }
       const payroll = s.pilots.reduce((sum, p) => sum + p.salary, 0);
@@ -60,7 +78,7 @@ export function pilotsView(ui: Ui): View {
           }),
         )
         .join('');
-      return `${actions}<p class="g-small">${s.pilots.length} pilote(s) · salaires ${money(payroll)} par mois</p><div class="g-list">${rows}</div>`;
+      return `${actions}<p class="g-small">${plural(s.pilots.length, 'pilote')} · salaires ${money(payroll)} par mois</p><div class="g-list">${rows}</div>`;
     },
     action(a, el) {
       if (a === 'hire') ui.push(hireView(ui));
@@ -103,12 +121,12 @@ function pilotView(ui: Ui, id: string): View {
         ${section(
           'Avion',
           ac
-            ? `${row({ action: 'aircraft', id: ac.id, icon: '✈️', title: esc(aircraftName(ac)), sub: esc(d.model(ac.modelId).name) })}${btn('Retirer de cet avion', 'unassign', { cls: 'ghost' })}`
+            ? `${row({ action: 'aircraft', id: ac.id, icon: icon('plane', 22), title: esc(aircraftName(ac)), sub: esc(d.model(ac.modelId).name) })}${btn('Retirer de cet avion', 'unassign', { cls: 'ghost' })}`
             : p.training
               ? note('En formation : il pourra voler à la fin.', 'info')
-              : btn('✈️ Affecter à un avion', 'assign'),
+              : btn(withIcon('plane', 'Affecter à un avion'), 'assign'),
         )}
-        ${section('Formation', btn('🎓 Se qualifier sur une autre famille', 'rating', { cls: 'ghost', disabled: !!p.training }))}
+        ${section('Formation', btn(withIcon('school', 'Se qualifier sur une autre famille'), 'rating', { cls: 'ghost', disabled: !!p.training }))}
         ${btn(`Licencier · ${money(p.salary * PILOT_SEVERANCE_MONTHS)} d’indemnité`, 'fire', { cls: 'ghost danger' })}
       `;
     },
@@ -164,7 +182,7 @@ function assignView(ui: Ui, pilotId: string): View {
             : row({
                 action: 'pick',
                 id: ac.id,
-                icon: '✈️',
+                icon: icon('plane', 22),
                 title: `${esc(aircraftName(ac))} <small>${esc(m.name)}</small>`,
                 sub: current ? `Remplace ${esc(pilotFullName(current))}` : 'Sans pilote',
               });
@@ -217,6 +235,7 @@ export function hireView(ui: Ui): View {
     render() {
       const s = ui.game.state;
       const d = ui.game.data;
+      if (!canRecruit(ui)) return `${locked(RECRUIT_LOCKED)}${btn(withIcon('school', 'Former un débutant'), 'train')}`;
       const mine = fleetFamilies(ui);
       const needs = [...mine].map((f) => {
         const fam = d.families.get(f);
@@ -243,6 +262,7 @@ export function hireView(ui: Ui): View {
     },
     action(a, el) {
       if (a === 'hire') ui.act(act.hirePilot, el.dataset.id!);
+      else if (a === 'train') ui.replace(trainNewView(ui));
     },
   };
 }
@@ -257,12 +277,12 @@ export function trainNewView(ui: Ui): View {
       const d = ui.game.data;
       const s = ui.game.state;
       const mine = fleetFamilies(ui);
-      const cost = trainingCost(d, s);
+      const { cost, days } = initialTraining(d, s);
       const fams = [...d.families.values()]
         .filter((f) => !f.large && f.models.some((m) => m.inProduction || mine.has(f.name)))
         .sort((a, b) => Number(mine.has(b.name)) - Number(mine.has(a.name)) || a.name.localeCompare(b.name));
       return `
-        <p class="g-small">Un élève pilote coûte <b>${money(cost)}</b> de formation et ${TRAINING_DAYS} jours d’école. Il sortira 1 étoile, qualifié sur la famille choisie (pas de gros-porteur pour commencer).</p>
+        <p class="g-small">Un élève pilote coûte <b>${money(cost)}</b> de formation et ${days} jours d’école. Il sortira 1 étoile, qualifié sur la famille choisie (pas de gros-porteur pour commencer).</p>
         <div class="g-list">${fams
           .map(
             (f) => `<div class="g-row static"><span class="g-row-main"><span class="g-row-title">${esc(f.name)} ${mine.has(f.name) ? badge('dans ta flotte', 'ok') : ''}</span>

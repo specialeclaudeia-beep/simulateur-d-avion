@@ -6,7 +6,8 @@ import * as act from '../../../game/actions';
 import { BANKRUPTCY_DAYS, DAY, DOMESTIC_VAT_MAX, DOMESTIC_VAT_SHARE, FUEL_PRICE_START, loanRate } from '../../../game/config';
 import { INVEST_KEYS, LEDGER_LABEL, OPEX_KEYS, REVENUE_KEYS, dailySeries, monthLabel, summarize, type DayPoint } from '../../../game/ledger';
 import type { MonthLedger } from '../../../game/state';
-import { btn, compact, esc, kv, money, note, num, num1, section, signedMoneyHtml } from '../dom';
+import type { IconName } from '../../icons';
+import { btn, compact, esc, kv, money, note, num, num1, plural, section, signedMoneyHtml, withIcon } from '../dom';
 import { barChart, pieChart } from './charts';
 import type { Ui, View } from '../ui';
 
@@ -29,13 +30,13 @@ function ledgerRows(l: MonthLedger, keys: typeof OPEX_KEYS, sign: 1 | -1): strin
 type Metric = 'profit' | 'revenue' | 'cash' | 'flights' | 'pax' | 'cargo';
 type Period = 'months' | 'days';
 
-const METRICS: { id: Metric; chip: string; title: string; yLabel: string }[] = [
-  { id: 'profit', chip: '💰 Résultat', title: 'Résultat net (bénéfice ou perte)', yLabel: 'dollars US ($)' },
-  { id: 'revenue', chip: '💵 Recettes', title: 'Recettes (billets + fret)', yLabel: 'dollars US ($)' },
-  { id: 'cash', chip: '🏦 Trésorerie', title: 'Trésorerie en fin de période', yLabel: 'dollars US ($)' },
-  { id: 'flights', chip: '✈️ Vols', title: 'Nombre de vols effectués', yLabel: 'vols' },
-  { id: 'pax', chip: '👥 Passagers', title: 'Passagers transportés', yLabel: 'passagers' },
-  { id: 'cargo', chip: '📦 Fret', title: 'Fret transporté', yLabel: 'tonnes (t)' },
+const METRICS: { id: Metric; icon: IconName; chip: string; title: string; yLabel: string }[] = [
+  { id: 'profit', icon: 'chart', chip: 'Résultat', title: 'Résultat net (bénéfice ou perte)', yLabel: 'dollars US ($)' },
+  { id: 'revenue', icon: 'money', chip: 'Recettes', title: 'Recettes (billets + fret)', yLabel: 'dollars US ($)' },
+  { id: 'cash', icon: 'bank', chip: 'Trésorerie', title: 'Trésorerie en fin de période', yLabel: 'dollars US ($)' },
+  { id: 'flights', icon: 'plane', chip: 'Vols', title: 'Nombre de vols effectués', yLabel: 'vols' },
+  { id: 'pax', icon: 'users', chip: 'Passagers', title: 'Passagers transportés', yLabel: 'passagers' },
+  { id: 'cargo', icon: 'box', chip: 'Fret', title: 'Fret transporté', yLabel: 'tonnes (t)' },
 ];
 
 function fmtFor(m: Metric): { fmt: (v: number) => string; tick: (v: number) => string } {
@@ -109,7 +110,7 @@ export function financesView(ui: Ui): View {
       ? pieChart(lineRevenue, money, 'Aucune recette ce mois-ci.')
       : pieChart(REVENUE_KEYS.map((k) => ({ label: LEDGER_LABEL[k], value: shown.entries[k] ?? 0 })), money, 'Aucune recette ce mois-ci.');
     return `
-      ${chips(METRICS.map((x) => [x.id, x.chip, x.id === metric]), 'metric')}
+      ${chips(METRICS.map((x) => [x.id, withIcon(x.icon, x.chip, 15), x.id === metric]), 'metric')}
       ${chips([['days', 'Jour par jour', period === 'days'], ['months', 'Mois par mois', period === 'months']], 'period')}
       <h4 class="g-chart-title">${esc(m.title)}${period === 'days' ? ` · ${esc(monthLabel(shown.month))}` : ' · 12 derniers mois'}</h4>
       ${bars}
@@ -146,7 +147,7 @@ export function financesView(ui: Ui): View {
       let alert = '';
       if (s.cash < 0 && s.negativeSince !== null) {
         const left = Math.max(0, BANKRUPTCY_DAYS - Math.floor((now - s.negativeSince) / DAY));
-        alert = note(`Trésorerie négative : faillite dans ${left} jour(s) si elle ne redevient pas positive. Emprunte ou vends un avion.`, 'bad');
+        alert = note(`Trésorerie négative : faillite dans ${plural(left, 'jour')} si elle ne redevient pas positive. Emprunte ou vends un avion.`, 'bad');
       }
 
       const fuelVsNormal = s.fuelPrice / FUEL_PRICE_START - 1;
@@ -157,7 +158,7 @@ export function financesView(ui: Ui): View {
             ['Trésorerie', `<b class="${s.cash < 0 ? 'neg' : ''}">${money(s.cash)}</b>`],
             ['Dette', money(s.debt)],
             ['Valeur de la compagnie', money(value)],
-            ['Réputation', `${Math.round(s.reputation)} / 100`],
+            ['Satisfaction des passagers', `${Math.floor(s.reputation)}\u202f%`],
             ['Kérosène', `${s.fuelPrice.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} $/kg <small>(${fuelVsNormal >= 0 ? '+' : ''}${Math.round(fuelVsNormal * 100)}\u202f% par rapport à la normale)</small>`],
           ])}
         </div>

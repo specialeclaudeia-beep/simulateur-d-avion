@@ -12,28 +12,28 @@
 
 /** Fichiers du jeu (code, données, icônes) : une seule version gardée à la fois. */
 const GAME_CACHE = `jeu-${VERSION}`;
-/** Morceaux de carte déjà vus (fond, relief, lumières de nuit), gardés d'une version à l'autre. */
+/** Morceaux de carte déjà vus (images satellite, noms, lumières de nuit), gardés d'une version à l'autre. */
 const MAP_CACHE = 'carte';
 /** Au-delà, les plus anciens morceaux de carte sont effacés (50 à 100 Mo au plus). */
-const MAP_MAX_ENTRIES = 1500;
+const MAP_MAX_ENTRIES = 2500;
 /** Réseau trop lent : on prend la copie gardée. */
 const NETWORK_TIMEOUT_MS = 4000;
 const INDEX = 'index.html';
 
-/** Serveurs de la carte : fond OpenFreeMap, relief AWS, lumières de nuit NASA. */
+/** Serveurs de la carte : images satellite EOX, noms et routes OpenFreeMap, lumières de nuit NASA. */
 const MAP_PREFIXES = [
+  'https://tiles.maps.eox.at/wmts/',
   'https://tiles.openfreemap.org/',
-  'https://s3.amazonaws.com/elevation-tiles-prod/',
   'https://gibs.earthdata.nasa.gov/wmts/',
 ];
 /**
- * Style du fond de carte et liste de ses tuiles : ils changent chaque semaine,
- * on prend donc la version en ligne quand c'est possible. Sans eux, la carte ne
- * démarre pas : ils sont gardés dès l'installation (même adresse de style que
- * src/map/baseStyle.ts).
+ * Liste des tuiles OpenFreeMap : elle change chaque semaine, on prend donc la
+ * version en ligne quand c'est possible. Sans elle, les noms et les frontières
+ * ne s'affichent pas : elle est gardée dès l'installation (même adresse que
+ * dans src/map/baseStyle.ts).
  */
-const MAP_FRESH = /^https:\/\/tiles\.openfreemap\.org\/(styles\/[^/]+|planet)$/;
-const MAP_ESSENTIALS = ['https://tiles.openfreemap.org/styles/liberty', 'https://tiles.openfreemap.org/planet'];
+const MAP_FRESH = /^https:\/\/tiles\.openfreemap\.org\/planet$/;
+const MAP_ESSENTIALS = ['https://tiles.openfreemap.org/planet'];
 
 // ── Installation : tous les fichiers du jeu sont gardés sur l'appareil ──
 

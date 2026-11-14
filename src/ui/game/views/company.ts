@@ -1,27 +1,36 @@
 /**
- * Ma compagnie : identité, installation du jeu comme une appli, chiffres
- * clés, classement face aux vraies compagnies, réglages, journal des
- * événements et sauvegarde (code à copier-coller, export et import d'un
- * fichier, nouvelle partie).
+ * Ma compagnie : identité et mode de jeu, objectifs (mode par échelons),
+ * installation du jeu comme une appli, chiffres clés, classement face aux
+ * vraies compagnies, réglages de la partie, journal des événements et
+ * sauvegarde (code à copier-coller, export et import d'un fichier, retour à
+ * l'accueil, nouvelle partie).
  */
 import * as act from '../../../game/actions';
+import { goalsReached, levelSpec } from '../../../game/campaign';
 import { DIFFICULTIES } from '../../../game/config';
-import { exportFileName, parseSave, serialize } from '../../../game/save';
+import { exportFileName, serialize } from '../../../game/save';
 import type { LogEntry } from '../../../game/state';
-import { music } from '../../../audio/music';
 import { canInstall, install, isInstalled } from '../../../pwa';
-import { btn, compact, dateLong, esc, flagEmoji, kv, money, num, section, when } from '../dom';
+import { icon, type IconName } from '../../icons';
+import { badge, btn, compact, dateLong, esc, flagEmoji, kv, money, num, row, section, when, withIcon } from '../dom';
 import { logoHtml } from '../logo';
+import { copyText, downloadText, readImport } from '../saves';
 import type { Ui, View } from '../ui';
 
 export interface CompanyHooks {
-  /** Le joueur veut recommencer (la sauvegarde actuelle sera effacée). */
+  /** Recommencer une partie dans le même mode (l'actuelle n'est remplacée qu'à la création de la nouvelle). */
   newGame(): void;
   /** Une sauvegarde importée vient d'être chargée. */
   loaded(): void;
+  /** Ouvrir les paramètres (son, graphismes, touches). */
+  settings(): void;
+  /** Enregistrer et revenir à l'accueil. */
+  home(): void;
+  /** Mode par échelons : voir les objectifs. */
+  goals(): void;
 }
 
-const LOG_ICON: Record<LogEntry['kind'], string> = { info: '•', good: '✅', bad: '⚠️', money: '💰' };
+const LOG_ICON: Record<LogEntry['kind'], IconName> = { info: 'info', good: 'checkCircle', bad: 'alert', money: 'money' };
 const JOURNAL_SIZE = 40;
 
 /** Rang qu'aurait la compagnie parmi les vraies, selon son nombre de lignes. */
@@ -40,9 +49,34 @@ function installSection(): string {
     'Appli',
     canInstall()
       ? `<p class="g-small">Installe le jeu sur ton écran d’accueil : il s’ouvrira en plein écran, comme une appli, même sans connexion.</p>
-         ${btn('📲 Installer le jeu', 'install')}`
+         ${btn(withIcon('install', 'Installer le jeu'), 'install')}`
       : '<p class="g-small">Pour installer le jeu comme une appli : menu ⋮ de Chrome, puis « Installer l’application » (ou « Ajouter à l’écran d’accueil »). Il s’ouvrira en plein écran, même sans connexion.</p>',
   );
+}
+
+/** Le mode de la partie, sous le nom de la compagnie. */
+function modeLine(ui: Ui): string {
+  const s = ui.game.state;
+  const c = s.campaign;
+  if (c) return c.finished ? 'Mode par échelons · tous les échelons gravis' : `Mode par échelons · échelon ${c.level}, ${esc(levelSpec(c.level).name)}`;
+  return `Partie libre ${s.competition ? 'avec' : 'sans'} concurrence · niveau ${esc(DIFFICULTIES[s.company.difficulty].label.toLowerCase())}`;
+}
+
+/** Mode par échelons : raccourci vers les objectifs, en tête de l'écran. */
+function goalsRow(ui: Ui): string {
+  const c = ui.game.state.campaign;
+  if (!c) return '';
+  if (c.finished) {
+    return `<div class="g-list">${row({ action: 'goals', icon: icon('trophy', 22), title: 'Campagne terminée', sub: 'Ton parcours, pays par pays' })}</div>`;
+  }
+  const n = goalsReached(c);
+  return `<div class="g-list">${row({
+    action: 'goals',
+    icon: icon('stairs', 22),
+    title: `Objectifs de l’échelon ${c.level}`,
+    sub: `${n} objectif${n > 1 ? 's' : ''} atteint${n > 1 ? 's' : ''} sur 3`,
+    right: c.cleared ? badge('Réussi', 'good') : '',
+  })}</div>`;
 }
 
 export function companyView(ui: Ui, hooks: CompanyHooks): View {
@@ -60,14 +94,15 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
       const st = s.settings;
       const journal = s.log
         .slice(0, JOURNAL_SIZE)
-        .map((e) => `<li class="${e.kind}"><span class="g-log-icon">${LOG_ICON[e.kind]}</span><span>${esc(e.text)}</span><time>${esc(when(e.t, now))}</time></li>`)
+        .map((e) => `<li class="${e.kind}"><span class="g-log-icon">${icon(LOG_ICON[e.kind], 16)}</span><span>${esc(e.text)}</span><time>${esc(when(e.t, now))}</time></li>`)
         .join('');
       return `
         <div class="g-card g-company" style="--company:${esc(c.color)}">
           <span class="g-company-logo">${logoHtml(c.logo, c.code, 64)}</span>
           <span><b>${esc(c.name)}</b><small>Code ${esc(c.code)} · ${flagEmoji(c.country)} ${esc(country?.name ?? c.country)} · fondée le ${esc(dateLong(c.founded))}</small>
-          <small>Niveau ${esc(DIFFICULTIES[c.difficulty].label)}</small></span>
+          <small>${modeLine(ui)}</small></span>
         </div>
+        ${goalsRow(ui)}
         ${installSection()}
         ${section(
           'En chiffres',
@@ -83,61 +118,40 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
         )}
         ${section(
           'Classement mondial',
-          `<p>Avec <b>${s.lines.length}</b> ligne(s), ta compagnie serait <b>${num(r.rank)}<sup>e</sup></b> sur ${num(r.total)} compagnies réelles${r.neighbour ? `, juste derrière ${esc(r.neighbour)}` : ' : la première du monde !'}.</p>`,
+          `<p>Avec <b>${s.lines.length}</b> ${s.lines.length > 1 ? 'lignes' : 'ligne'}, ta compagnie serait <b>${num(r.rank)}<sup>e</sup></b> sur ${num(r.total)} compagnies réelles${r.neighbour ? `, juste derrière ${esc(r.neighbour)}` : ' : la première du monde !'}.</p>`,
         )}
         ${section(
-          'Réglages',
+          'Réglages de la partie',
           `<label class="g-toggle"><input type="checkbox" data-in="autoMaintenance"${st.autoMaintenance ? ' checked' : ''}><span>Révision automatique au hub quand l’état passe sous
-             <select class="g-input inline" data-in="maintenanceThreshold">${[40, 50, 60, 70, 80].map((v) => `<option value="${v}"${v === st.maintenanceThreshold ? ' selected' : ''}>${v}\u202f%</option>`).join('')}</select></span></label>
+             <select class="g-input inline" data-in="maintenanceThreshold">${[40, 50, 60, 70, 80].map((v) => `<option value="${v}"${v === st.maintenanceThreshold ? ' selected' : ''}>${v} %</option>`).join('')}</select></span></label>
            <label class="g-toggle"><input type="checkbox" data-in="autoRepair"${st.autoRepair ? ' checked' : ''}><span>Réparer automatiquement les pannes</span></label>
-           <label class="g-toggle"><input type="checkbox" data-in="offlineProgress"${st.offlineProgress ? ' checked' : ''}><span>Le temps continue quand le jeu est fermé (jusqu’à 7 jours, à vitesse réelle)</span></label>`,
-        )}
-        ${section(
-          'Son',
-          `<label class="g-toggle"><input type="checkbox" data-in="musicOn"${music.on ? ' checked' : ''}><span>Son (musique et bruitages)</span></label>
-           <label class="g-volume"><span>Musique</span><input type="range" min="0" max="100" step="5" value="${Math.round(music.volume * 100)}" data-in="musicVolume" aria-label="Volume de la musique"></label>
-           <label class="g-volume"><span>Bruitages</span><input type="range" min="0" max="100" step="5" value="${Math.round(music.fxVolume * 100)}" data-in="fxVolume" aria-label="Volume des bruitages"></label>
-           <label class="g-toggle"><input type="checkbox" data-in="uiSounds"${music.uiOn ? ' checked' : ''}><span>Sons des boutons et des messages</span></label>
-           <p class="g-small">Touche un avion sur la carte pour l’entendre, du décollage à l’atterrissage ; dans sa fiche, le bouton 🎧 change d’endroit : dehors, cabine ou cockpit.</p>
-           <p class="g-small">${music.on ? `${music.playing ? '♪ En cours' : 'Prochain morceau'} : <b>${esc(music.track.title)}</b>` : 'Musique coupée.'}</p>
-           ${btn('⏭ Morceau suivant', 'nextTrack', { cls: 'ghost' })}`,
+           <label class="g-toggle"><input type="checkbox" data-in="offlineProgress"${st.offlineProgress ? ' checked' : ''}><span>Le temps continue quand le jeu est fermé (jusqu’à 7 jours, à vitesse réelle)</span></label>
+           <div class="g-list">${row({ action: 'settings', icon: icon('gear', 22), title: 'Paramètres du jeu', sub: 'Son, graphismes, images par seconde, touches du clavier' })}</div>`,
         )}
         ${section('Journal', journal ? `<ul class="g-log">${journal}</ul>` : '<p class="g-small">Rien pour l’instant.</p>')}
         ${section(
           'Sauvegarde',
-          `<p class="g-small">La partie s’enregistre toute seule dans ce navigateur, et chaque navigateur garde la sienne. Pour la continuer ailleurs (autre navigateur, appli installée, autre appareil) : copie son code ici et colle-le là-bas, ou passe par un fichier.</p>
+          `<p class="g-small">La partie s’enregistre toute seule dans ce navigateur, et chaque navigateur garde les siennes. Pour la continuer ailleurs (autre navigateur, appli installée, autre appareil) : copie son code ici et colle-le là-bas, ou passe par un fichier.</p>
            <div class="g-actions">
-             ${btn('📋 Copier le code', 'copy', { cls: 'ghost' })}
-             ${btn('📥 Coller un code', 'paste', { cls: 'ghost' })}
+             ${btn(withIcon('copy', 'Copier le code'), 'copy', { cls: 'ghost' })}
+             ${btn(withIcon('paste', 'Coller un code'), 'paste', { cls: 'ghost' })}
            </div>
            <div class="g-actions">
-             ${btn('⬇️ Exporter la partie', 'export', { cls: 'ghost' })}
-             <label class="g-btn ghost g-file">⬆️ Importer une partie<input type="file" accept="application/json,.json" data-in="import"></label>
+             ${btn(withIcon('download', 'Exporter la partie'), 'export', { cls: 'ghost' })}
+             <label class="g-btn ghost g-file">${withIcon('upload', 'Importer une partie')}<input type="file" accept="application/json,.json" data-in="import"></label>
            </div>
-           ${btn('Nouvelle partie', 'new', { cls: 'ghost danger' })}`,
+           ${btn(withIcon('home', 'Enregistrer et revenir à l’accueil'), 'home', { cls: 'ghost' })}
+           ${btn(withIcon('plus', 'Nouvelle partie'), 'new', { cls: 'ghost danger' })}`,
         )}
       `;
     },
     input(el, final) {
       const key = el.dataset.in!;
-      if (key === 'import' && final) {
-        void importSave(ui, el as HTMLInputElement, hooks);
-        return;
-      }
-      if (key === 'musicVolume' || key === 'fxVolume') {
-        if (key === 'musicVolume') music.setVolume(Number(el.value) / 100);
-        else music.setFxVolume(Number(el.value) / 100);
+      if (key === 'import') {
+        if (final) void importSave(ui, el as HTMLInputElement, hooks);
         return;
       }
       if (!final) return;
-      if (key === 'musicOn') {
-        music.setOn((el as HTMLInputElement).checked);
-        return;
-      }
-      if (key === 'uiSounds') {
-        music.setUiOn((el as HTMLInputElement).checked);
-        return;
-      }
       if (key === 'maintenanceThreshold') ui.act(act.updateSettings, { maintenanceThreshold: Number(el.value) });
       else if (key === 'autoMaintenance' || key === 'autoRepair' || key === 'offlineProgress') {
         ui.act(act.updateSettings, { [key]: (el as HTMLInputElement).checked });
@@ -145,9 +159,11 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
     },
     action(a) {
       if (a === 'export') exportSave(ui);
-      else if (a === 'nextTrack') music.next();
       else if (a === 'copy') void copySaveCode(ui);
       else if (a === 'paste') void pasteSaveCode(ui, hooks);
+      else if (a === 'goals') hooks.goals();
+      else if (a === 'settings') hooks.settings();
+      else if (a === 'home') hooks.home();
       else if (a === 'install') {
         void install().then((ok) => {
           if (ok) ui.toast('Le jeu s’installe sur ton écran d’accueil.', 'good');
@@ -156,8 +172,8 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
         void ui
           .confirm({
             title: 'Recommencer une partie ?',
-            text: 'La partie actuelle sera <b>effacée de ce navigateur</b>. Exporte-la avant si tu veux pouvoir la reprendre.',
-            ok: 'Effacer et recommencer',
+            text: 'Tu vas créer une nouvelle compagnie dans ce mode de jeu. La partie actuelle sera <b>remplacée</b> dès que la nouvelle sera créée. Exporte-la avant si tu veux pouvoir la reprendre.',
+            ok: 'Nouvelle partie',
             danger: true,
           })
           .then((yes) => {
@@ -171,27 +187,15 @@ export function companyView(ui: Ui, hooks: CompanyHooks): View {
 function exportSave(ui: Ui): void {
   ui.game.saveNow();
   const state = ui.game.state;
-  const blob = new Blob([serialize(state)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = exportFileName(state);
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  downloadText(exportFileName(state), serialize(state));
   ui.toast('Fichier de sauvegarde téléchargé.', 'good');
 }
 
 /** Copie la partie sous forme de code, à coller dans un autre navigateur (« Coller un code »). */
 async function copySaveCode(ui: Ui): Promise<void> {
   ui.game.saveNow();
-  try {
-    await navigator.clipboard.writeText(serialize(ui.game.state));
-    ui.toast('Code copié. Dans l’autre navigateur : Ma compagnie, puis « Coller un code ».', 'good');
-  } catch {
-    ui.toast('Ce navigateur refuse la copie : utilise plutôt « Exporter la partie ».', 'bad');
-  }
+  if (await copyText(serialize(ui.game.state))) ui.toast('Code copié. Dans l’autre navigateur : Mon compte (à l’accueil), puis « Coller un code ».', 'good');
+  else ui.toast('Ce navigateur refuse la copie : utilise plutôt « Exporter la partie ».', 'bad');
 }
 
 /** Charge une partie à partir d'un code collé (copié dans un autre navigateur). */
@@ -213,24 +217,15 @@ async function importSave(ui: Ui, input: HTMLInputElement, hooks: CompanyHooks):
   if (file) await importSaveText(ui, await file.text(), hooks);
 }
 
-/** Remplace la partie en cours par celle d'un fichier ou d'un code, après confirmation. */
+/** Charge la partie d'un fichier ou d'un code à la place de la partie en cours, après confirmation. */
 async function importSaveText(ui: Ui, text: string, hooks: CompanyHooks): Promise<void> {
-  const res = parseSave(text);
-  if (!res.ok) {
-    ui.toast(res.error, 'bad');
-    return;
-  }
-  const name = res.save.state.company.name;
-  const yes = await ui.confirm({
-    title: 'Charger cette partie ?',
-    text: `« ${esc(name)} » remplacera la partie en cours dans ce navigateur.`,
-    ok: 'Charger',
-    danger: true,
-  });
-  if (!yes) return;
+  const save = await readImport(ui, text, ui.game.slot);
+  if (!save) return;
+  // La partie en cours reste enregistrée dans son emplacement (sauf si l'importée prend sa place).
+  ui.game.saveNow();
   // Pas de « temps écoulé pendant l'absence » pour un fichier importé : on reprend où il s'était arrêté.
-  ui.game.loadSave({ ...res.save, savedAtReal: Date.now() });
+  ui.game.loadSave({ ...save, savedAtReal: Date.now() });
   ui.game.saveNow();
   hooks.loaded();
-  ui.toast(`Partie « ${name} » chargée.`, 'good');
+  ui.toast(`Partie « ${save.state.company.name} » chargée.`, 'good');
 }

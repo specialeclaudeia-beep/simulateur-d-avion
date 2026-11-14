@@ -7,7 +7,70 @@
  */
 import type { Difficulty } from './config';
 
-export const SAVE_VERSION = 1;
+/**
+ * Version 2 : modes de jeu (partie libre avec ou sans concurrence, mode par
+ * échelons). Les parties de la version 1 deviennent des parties libres avec
+ * concurrence, sans rien perdre (voir migrate() dans save.ts).
+ */
+export const SAVE_VERSION = 2;
+
+// ───────────────────────── Modes de jeu ─────────────────────────
+
+/** Partie libre (le jeu d'origine) ou mode par échelons (pays par pays, à petite échelle d'abord). */
+export type GameMode = 'libre' | 'echelons';
+
+/**
+ * Ce qui a changé sur une ligne par rapport aux vraies compagnies qui la
+ * desservent (mode « avec concurrence ») : nouvelles venues, départs, guerre
+ * des prix en cours.
+ */
+export interface Rivalry {
+  /** Compagnies arrivées sur la ligne depuis le début de la partie (codes IATA). */
+  entrants: string[];
+  /** Compagnies qui ont abandonné la ligne. */
+  gone: string[];
+  /** Guerre des prix en cours : qui la mène et jusqu'à quand. */
+  war: { airline: string; until: number } | null;
+}
+
+/** Améliorations à choisir entre deux échelons (voir campaign.ts). */
+export type PerkId =
+  | 'fleet'
+  | 'lines'
+  | 'recruit'
+  | 'cargo'
+  | 'quality'
+  | 'workshop'
+  | 'bigger'
+  | 'hub'
+  | 'intl'
+  | 'deal'
+  | 'school'
+  | 'capital';
+
+/** Les trois objectifs d'un échelon : relier des aéroports, satisfaire les passagers, gagner de l'argent. */
+export type GoalId = 'airports' | 'satisfaction' | 'profit';
+
+/** Avancement du mode par échelons. */
+export interface Campaign {
+  /** Échelon en cours (1 = le premier pays). */
+  level: number;
+  /** Améliorations choisies depuis le début (une même amélioration peut être prise plusieurs fois). */
+  perks: PerkId[];
+  /** Pays déjà terminés (durée en jours de jeu, objectifs atteints, bénéfices réalisés). */
+  done: { country: string; level: number; days: number; goals: number; profit: number }[];
+  /** Objectifs de l'échelon en cours. */
+  goals: Record<GoalId, number>;
+  /** Objectifs déjà atteints (un objectif atteint reste acquis). */
+  reached: Record<GoalId, boolean>;
+  /** Assez d'objectifs atteints : le pays suivant est ouvert. */
+  cleared: boolean;
+  /** Dernier échelon réussi : la campagne est finie, plus aucune limite. */
+  finished: boolean;
+  levelStartedAt: number;
+  /** Capital de départ de cet échelon. */
+  capital: number;
+}
 
 // ───────────────────────── Compagnie ─────────────────────────
 
@@ -304,6 +367,13 @@ export interface GameState {
   stats: { flights: number; pax: number; cargoT: number; km: number; revenue: number };
   log: LogEntry[];
   settings: Settings;
+  mode: GameMode;
+  /** Les autres compagnies se disputent-elles les passagers ? (faux : partie libre « sans concurrence ») */
+  competition: boolean;
+  /** Évolution de la concurrence, par ligne (clé GameData.routeKey). */
+  rivalry: Record<string, Rivalry>;
+  /** Mode par échelons seulement. */
+  campaign: Campaign | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {

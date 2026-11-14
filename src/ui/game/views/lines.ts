@@ -4,12 +4,15 @@
  * billet, avions affectés, résultats, fermeture).
  */
 import * as act from '../../../game/actions';
+import { PERKS, limits } from '../../../game/campaign';
+import { demandContext, playerShare, presentRivals, rivalList, warOn } from '../../../game/competition';
 import { PRICE_FACTOR_MAX, PRICE_FACTOR_MIN } from '../../../game/config';
 import type { Route } from '../../../game/data';
 import { domesticVatRate, playerPaxPerDay, referenceFare, routeProblem } from '../../../game/economy';
 import { lineFrequency } from '../../../game/schedule';
 import { emptyStats, type Line } from '../../../game/state';
-import { badge, btn, dateLong, empty, esc, flagEmoji, fold, kv, money, note, num, pct, row, section, signedMoneyHtml } from '../dom';
+import { icon } from '../../icons';
+import { badge, btn, dateLong, empty, esc, flagEmoji, fold, kv, locked, money, note, num, pct, plural, quota, row, section, signedMoneyHtml, withIcon } from '../dom';
 import type { Ui, View } from '../ui';
 import { aircraftName, cityOf, place } from './common';
 import { aircraftView, buyNewView } from './fleet';
@@ -32,22 +35,34 @@ function expectedPax(ui: Ui, line: Line, legsPerDay: number): number {
   const d = ui.game.data;
   const route = d.route(line.hub, line.dest);
   if (!route) return 0;
-  const s = ui.game.state;
-  return playerPaxPerDay({
-    route,
-    line,
-    hub: s.hubs.find((h) => h.iata === line.hub),
-    reputation: s.reputation,
-    condition: 90,
-    legsPerDay,
-  });
+  return playerPaxPerDay(demandContext(ui.ctx, line, route, 90, legsPerDay, ui.game.state.time));
 }
 
-/** Les compagnies réelles déjà présentes sur une ligne, en toutes lettres. */
+/**
+ * Les compagnies présentes sur une ligne, en toutes lettres, avec ce qui a
+ * changé depuis le début de la partie (nouvelle venue, guerre des prix).
+ */
 function competitors(ui: Ui, r: Route, max = 4): string {
-  if (!r.airlines.length) return 'aucune compagnie';
-  const names = r.airlines.slice(0, max).map((c) => esc(ui.game.data.airlineName(c)));
-  return names.join(', ') + (r.airlines.length > max ? ` et ${r.airlines.length - max} autre(s)` : '');
+  if (!ui.game.state.competition) return 'aucun (partie sans concurrence)';
+  const present = rivalList(ui.ctx, r, ui.now).filter((x) => x.status !== 'gone');
+  if (!present.length) return 'aucune compagnie';
+  const names = present
+    .slice(0, max)
+    .map((x) => `${esc(x.name)}${x.status === 'war' ? ` ${badge('guerre des prix', 'bad')}` : x.status === 'new' ? ` ${badge('nouvelle', 'warn')}` : ''}`);
+  return names.join(', ') + (present.length > max ? ` et ${plural(present.length - max, 'autre')}` : '');
+}
+
+/** Nombre de concurrents sur une ligne, en quelques mots (liste des destinations). */
+function rivalCount(ui: Ui, r: Route): string {
+  if (!ui.game.state.competition) return 'sans concurrence';
+  const n = presentRivals(ui.game.state, r).length;
+  return n ? plural(n, 'concurrent') : 'aucun concurrent';
+}
+
+/** Mode par échelons : toutes les lignes autorisées sont-elles ouvertes ? */
+function linesFull(ui: Ui): boolean {
+  const lim = limits(ui.game.state);
+  return !!lim && ui.game.state.lines.length >= lim.lines;
 }
 
 function lineTitle(ui: Ui, l: Line): string {
@@ -63,7 +78,8 @@ export function linesView(ui: Ui): View {
     title: () => 'Lignes',
     render() {
       const s = ui.game.state;
-      const top = btn('＋ Ouvrir une ligne', 'open');
+      const lim = limits(s);
+      const top = btn(withIcon('plus', 'Ouvrir une ligne'), 'open');
       if (!s.lines.length) {
         return top + empty('Aucune ligne pour l’instant. Ouvre une ligne réelle depuis ton hub, puis affecte-lui un avion et un pilote.');
       }
@@ -77,16 +93,16 @@ export function linesView(ui: Ui): View {
           return row({
             action: 'line',
             id: l.id,
-            icon: served ? '🛫' : '⏸️',
+            icon: served ? icon('takeoff', 22) : icon('pauseCircle', 22, 'warn'),
             title: lineTitle(ui, l),
             sub: served
-              ? `${served} avion(s) · ${perDay.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} vol(s)/jour · ce mois : ${m.flights ? `remplissage ${pct(load)}, marge ${signedMoneyHtml(m.revenue - m.costs)}` : 'pas encore de vol'}`
+              ? `${plural(served, 'avion')} · ${perDay.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} ${perDay >= 2 ? 'vols' : 'vol'}/jour · ce mois : ${m.flights ? `remplissage ${pct(load)}, marge ${signedMoneyHtml(m.revenue - m.costs)}` : 'pas encore de vol'}`
               : `${badge('Sans avion', 'warn')} ${num(l.km)} km`,
             right: `${Math.round(l.priceFactor * 100)}\u202f%`,
           });
         })
         .join('');
-      return `${top}<p class="g-small">${s.lines.length} ligne(s). À droite : prix du billet par rapport au prix habituel.</p><div class="g-list">${rows}</div>`;
+      return `${top}<p class="g-small">${lim ? quota('route', s.lines.length, lim.lines, 'Lignes autorisées à cet échelon') : `${plural(s.lines.length, 'ligne')}.`} À droite : prix du billet par rapport au prix habituel.</p><div class="g-list">${rows}</div>`;
     },
     action(a, el) {
       if (a === 'open') ui.push(openLineView(ui, ui.game.state.hubs[0].iata));
@@ -109,6 +125,9 @@ export function openLineView(ui: Ui, startHub: string): View {
     const taken = new Set(s.lines.filter((l) => l.hub === hub || l.dest === hub).map((l) => (l.hub === hub ? l.dest : l.hub)));
     const q = fold(search.trim());
     let list = d.routesFrom(hub).filter((r) => !taken.has(otherEnd(r, hub)));
+    // Mode par échelons : tant que les droits internationaux ne sont pas acquis, lignes intérieures seulement.
+    const lim = limits(s);
+    if (lim && !lim.intl) list = list.filter((r) => d.airport(otherEnd(r, hub)).country === s.company.country);
     if (q) {
       list = list.filter((r) => {
         const a = d.airport(otherEnd(r, hub));
@@ -147,7 +166,7 @@ export function openLineView(ui: Ui, startHub: string): View {
             id: dest.iata,
             icon: `<span class="g-flag">${flagEmoji(dest.country)}</span>`,
             title: `${esc(dest.city || dest.name)} <small>${dest.iata}</small>`,
-            sub: `${num(r.km)} km · ${num(r.demand)} pass./jour · ${r.airlines.length ? `${r.airlines.length} concurrent(s)` : 'aucun concurrent'}`,
+            sub: `${num(r.km)} km · ${num(r.demand)} pass./jour · ${rivalCount(ui, r)}`,
             right: money(act.lineOpeningCost(r.km)),
           });
         })
@@ -158,10 +177,14 @@ export function openLineView(ui: Ui, startHub: string): View {
               .map((x) => `<option value="${x.iata}"${x.iata === hub ? ' selected' : ''}>${esc(cityOf(d, x.iata))} (${x.iata})</option>`)
               .join('')}</select></label>`
           : '';
+      const lim = limits(s);
+      const domesticOnly = !!lim && !lim.intl;
       return `
         ${hubPicker}
-        <p class="g-small">Licences de lignes à ${esc(cityOf(d, hub))} : <b>${used} / ${h.lineSlots}</b> utilisées.</p>
-        ${used >= h.lineSlots ? `${note('Toutes les licences sont utilisées : achète une licence de plus à ce hub.', 'warn')}${btn('🏢 Améliorer le hub', 'hub', { cls: 'ghost' })}` : ''}
+        <p class="g-small">Licences de lignes à ${esc(cityOf(d, hub))} : <b>${used} / ${h.lineSlots}</b> utilisées.${lim ? ` ${quota('route', s.lines.length, lim.lines, 'Lignes autorisées à cet échelon')}` : ''}</p>
+        ${linesFull(ui) ? locked(`${lim!.lines} lignes au plus à cet échelon. L’amélioration « ${PERKS.lines.title} » ou l’échelon suivant en autorisent plus.`) : ''}
+        ${domesticOnly ? locked(`Lignes intérieures seulement pour l’instant : l’étranger s’ouvre à l’échelon 5 ou avec l’amélioration « ${PERKS.intl.title} ».`) : ''}
+        ${used >= h.lineSlots ? `${note('Toutes les licences sont utilisées : achète une licence de plus à ce hub.', 'warn')}${btn(withIcon('hub', 'Améliorer le hub'), 'hub', { cls: 'ghost' })}` : ''}
         <input class="g-input" type="search" data-in="search" placeholder="Rechercher une ville, un pays…" value="${esc(search)}">
         <div class="g-chips">
           ${(['demand', 'near', 'far'] as const).map((k) => `<button type="button" class="g-chip${sort === k ? ' on' : ''}" data-a="sort" data-id="${k}">${{ demand: 'Plus de passagers', near: 'Plus proches', far: 'Plus lointaines' }[k]}</button>`).join('')}
@@ -223,12 +246,14 @@ function linePreviewView(ui: Ui, hub: string, dest: string): View {
       const cost = act.lineOpeningCost(route.km);
       const h = s.hubs.find((x) => x.iata === hub)!;
       const full = s.lines.filter((l) => l.hub === hub).length >= h.lineSlots;
+      const capped = linesFull(ui);
       return `
         <div class="g-card">
           ${kv([
             ['Distance', `${num(route.km)} km`],
             ['Demande réelle', `${num(route.demand)} passagers par jour et par sens`],
             ['Concurrents', competitors(ui, route, 6)],
+            ['Ta part des passagers', `≈ ${pct(playerShare(ui.ctx, fake, route, ui.now))} <small>(avec 1 vol par jour)</small>`],
             ['Billet moyen', `${money(fare)}${vat > 0 ? ` <small>(TVA intérieure ${pct(vat)})</small>` : ''}`],
             ['Tes passagers estimés', `≈ ${num(one)} par jour avec 1 vol quotidien, ${num(three)} avec 3`],
             ['Ouverture', money(cost)],
@@ -242,7 +267,8 @@ function linePreviewView(ui: Ui, hub: string, dest: string): View {
               : note('Pas encore d’avion basé ici : tu en achèteras un juste après.', 'info')
         }
         ${full ? note('Plus de licence de ligne libre à ce hub.', 'warn') : ''}
-        ${btn(`Ouvrir la ligne · ${money(cost)}`, 'open', { disabled: full || cost > s.cash })}
+        ${capped ? locked('Toutes les lignes autorisées à cet échelon sont ouvertes.') : ''}
+        ${btn(`Ouvrir la ligne · ${money(cost)}`, 'open', { disabled: full || capped || cost > s.cash })}
       `;
     },
     action(a) {
@@ -302,8 +328,23 @@ export function lineView(ui: Ui, id: string): View {
           ['Coûts des vols', money(x.costs)],
           ['Marge', signedMoneyHtml(x.revenue - x.costs)],
         ]);
+      const war = route ? warOn(s, route, ui.now) : null;
+      const gone = route ? rivalList(ui.ctx, route, ui.now).filter((x) => x.status === 'gone') : [];
+      const rivalry =
+        route && s.competition
+          ? section(
+              'Concurrence',
+              `${war ? note(`Guerre des prix : ${esc(d.airlineName(war.airline))} casse ses tarifs jusqu’au ${esc(dateLong(war.until))}. Baisse tes prix ou laisse passer l’orage.`, 'bad') : ''}
+               ${kv([
+                 ['Ta part des passagers', `≈ ${pct(playerShare(ui.ctx, l, route, ui.now))}`],
+                 ['Compagnies sur la ligne', competitors(ui, route, 8)],
+                 ...(gone.length ? ([['Ont abandonné', gone.map((x) => esc(x.name)).join(', ')]] as [string, string][]) : []),
+               ])}
+               <p class="g-small">Une ligne bien remplie et sans rivale attire de nouvelles compagnies ; une compagnie appréciée et bien installée finit par les décourager.</p>`,
+            )
+          : '';
       return `
-        <p class="g-small">${num(l.km)} km · ouverte le ${esc(dateLong(l.openedAt))}${route ? ` · concurrents : ${competitors(ui, route)}` : ''}</p>
+        <p class="g-small">${num(l.km)} km · ouverte le ${esc(dateLong(l.openedAt))}${route && !s.competition ? ' · partie sans concurrence' : ''}</p>
         ${section(
           'Prix du billet',
           `<div class="g-price-box">
@@ -317,10 +358,11 @@ export function lineView(ui: Ui, id: string): View {
         ${section(
           `Avions sur la ligne (${served.length})`,
           (served.length
-            ? `<div class="g-list">${served.map((a) => row({ action: 'aircraft', id: a.id, icon: '✈️', title: esc(aircraftName(a)), sub: esc(d.model(a.modelId).name) })).join('')}</div>
-               <p class="g-small">≈ ${legs.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} vol(s) par jour dans chaque sens.</p>`
-            : note('Aucun avion : la ligne ne rapporte rien.', 'warn')) + btn('＋ Affecter un avion', 'assign', { cls: served.length ? 'ghost' : '' }),
+            ? `<div class="g-list">${served.map((a) => row({ action: 'aircraft', id: a.id, icon: icon('plane', 22), title: esc(aircraftName(a)), sub: esc(d.model(a.modelId).name) })).join('')}</div>
+               <p class="g-small">≈ ${legs.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} ${legs >= 2 ? 'vols' : 'vol'} par jour dans chaque sens.</p>`
+            : note('Aucun avion : la ligne ne rapporte rien.', 'warn')) + btn(withIcon('plus', 'Affecter un avion'), 'assign', { cls: served.length ? 'ghost' : '' }),
         )}
+        ${rivalry}
         ${section('Ce mois-ci', stats(m))}
         ${section('Depuis l’ouverture', stats(t))}
         ${btn('Fermer la ligne', 'close', { cls: 'ghost danger' })}
@@ -390,15 +432,15 @@ function assignAircraftView(ui: Ui, lineId: string): View {
             : row({
                 action: 'pick',
                 id: ac.id,
-                icon: '✈️',
+                icon: icon('plane', 22),
                 title: `${esc(aircraftName(ac))} <small>${esc(m.name)}</small>`,
-                sub: others ? `Dessert déjà ${others} ligne(s) : il alternera` : 'Libre',
+                sub: others ? `Dessert déjà ${plural(others, 'ligne')} : il alternera` : 'Libre',
               });
         })
         .join('');
       return rows
         ? `<p class="g-small">L’avion doit être basé à ${esc(cityOf(d, l.hub))} et pouvoir faire ${num(l.km)} km.</p><div class="g-list">${rows}</div>`
-        : empty('Tous tes avions desservent déjà cette ligne, ou tu n’as pas encore d’avion.', btn('🛒 Acheter un avion', 'buy'));
+        : empty('Tous tes avions desservent déjà cette ligne, ou tu n’as pas encore d’avion.', btn(withIcon('cart', 'Acheter un avion'), 'buy'));
     },
     action(a, el) {
       if (a === 'pick') {

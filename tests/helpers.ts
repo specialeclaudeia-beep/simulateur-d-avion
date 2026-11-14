@@ -4,7 +4,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { createGameData, type GameData, type Airline, type Airport, type RouteTuple } from '../src/game/data';
-import { createNewGame } from '../src/game/newGame';
+import { createNewGame, type NewGameParams } from '../src/game/newGame';
 import type { Ctx } from '../src/game/context';
 import type { Pilot } from '../src/game/state';
 
@@ -25,7 +25,13 @@ export function realData(): GameData {
 /** 8 novembre 2026, 10 h UTC. */
 export const T0 = Date.UTC(2026, 10, 8, 10, 0, 0);
 
-export function newTestGame(hub = 'NCE', country = 'FR', difficulty: 'facile' | 'normal' | 'difficile' = 'normal', seed = 42): Ctx {
+export function newTestGame(
+  hub = 'NCE',
+  country = 'FR',
+  difficulty: 'facile' | 'normal' | 'difficile' = 'normal',
+  seed = 42,
+  extra: Partial<NewGameParams> = {},
+): Ctx {
   return createNewGame(
     realData(),
     {
@@ -36,10 +42,16 @@ export function newTestGame(hub = 'NCE', country = 'FR', difficulty: 'facile' | 
       country,
       difficulty,
       hub,
+      ...extra,
     },
     T0,
     seed,
   );
+}
+
+/** Partie en mode par échelons (échelon 1), par défaut à Strasbourg. */
+export function newCampaignGame(hub = 'SXB', country = 'FR', seed = 42): Ctx {
+  return newTestGame(hub, country, 'normal', seed, { mode: 'echelons' });
 }
 
 /** Ajoute directement un pilote qualifié (pour les tests). */

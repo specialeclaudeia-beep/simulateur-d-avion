@@ -4,30 +4,51 @@
  *   2. pays d'administration (impôts, aéroports, trafic) — liste ou toucher le globe ;
  *   3. capital de départ (difficulté) ;
  *   4. premier hub parmi les vrais aéroports du pays, classés par trafic.
+ *
+ * En mode par échelons, il n'y a pas d'étape « capital » (il est fixé par
+ * l'échelon) et on ne propose que les pays et les hubs où le premier échelon
+ * est jouable : un petit aéroport relié à au moins deux autres du même pays.
  */
 import type { Map as MapLibreMap } from 'maplibre-gl';
+import { LEVELS, domesticDests, eligibleCountries, hubsFor, levelGoals } from '../../game/campaign';
 import { DIFFICULTIES, DOMESTIC_VAT_MAX, DOMESTIC_VAT_SHARE, FIRST_HUB_BUDGET_SHARE, FIRST_HUB_MIN_LEFT, HUB_START, type Difficulty } from '../../game/config';
 import { TIER_LABEL, type Airport, type Country, type GameData } from '../../game/data';
 import { suggestCode, type NewGameParams } from '../../game/newGame';
-import type { Logo, LogoShape } from '../../game/state';
+import type { GameMode, Logo, LogoShape } from '../../game/state';
 import type { Countries } from '../../map/countries';
 import { globeZoom } from '../../map/createMap';
 import type { NetworkLayer } from '../../map/networkLayer';
-import { compact, esc, flagEmoji, fold, kv, money, note, num, num1 } from './dom';
+import { icon } from '../icons';
+import { compact, esc, flagEmoji, fold, kv, money, note, num, num1, plural, withIcon } from './dom';
 import { LOGO_SHAPES, LOGO_SYMBOLS, PALETTE, imageToLogo, logoHtml } from './logo';
-import { mapPadding } from './ui';
+import { mapPadding, sidePanel } from './ui';
 
 export interface WizardDeps {
   data: GameData;
   map: MapLibreMap;
   countries: Countries;
   network: NetworkLayer;
+  /** Partie libre ou mode par échelons. */
+  mode: GameMode;
+  /** Partie libre : avec ou sans concurrence. */
+  competition: boolean;
   /** Message à afficher en haut (ex. sauvegarde illisible mise de côté). */
   notice?: string;
   onDone(params: NewGameParams): void;
+  /** Le joueur abandonne la création (retour à l'accueil). */
+  onCancel(): void;
 }
 
-const STEPS = ['Compagnie', 'Pays', 'Capital', 'Premier hub'];
+/** Pour piloter la création au clavier (touche Échap). */
+export interface WizardHandle {
+  /** Étape précédente ; à la première étape, abandonne la création. */
+  back(): void;
+  /** Ferme la création sans rien créer. */
+  cancel(): void;
+}
+
+type StepId = 'company' | 'country' | 'capital' | 'hub';
+const STEP_LABEL: Record<StepId, string> = { company: 'Compagnie', country: 'Pays', capital: 'Capital', hub: 'Premier hub' };
 const LIST_LIMIT = 60;
 
 /** Texte lisible sur une couleur de fond (blanc ou presque noir). */
@@ -37,8 +58,11 @@ function contrastOn(hex: string): string {
   return lum > 165 ? '#111827' : '#ffffff';
 }
 
-export function runWizard(deps: WizardDeps): void {
+export function runWizard(deps: WizardDeps): WizardHandle {
   const { data, map, countries, network } = deps;
+  const campaign = deps.mode === 'echelons';
+  const steps: StepId[] = campaign ? ['company', 'country', 'hub'] : ['company', 'country', 'capital', 'hub'];
+  const modeText = campaign ? 'Mode par échelons' : `Partie libre ${deps.competition ? 'avec' : 'sans'} concurrence`;
 
   // ── État du formulaire ──
   const st = {
@@ -55,27 +79,35 @@ export function runWizard(deps: WizardDeps): void {
     hub: null as string | null,
     hubSearch: '',
   };
-  const playable = data.playableCountries();
+  // Mode par échelons : seulement les pays où le premier échelon est jouable.
+  const playable = campaign ? eligibleCountries(data, 1) : data.playableCountries();
   const playableSet = new Set(playable.map((c) => c.code));
+  const stepId = (): StepId => steps[st.step];
+  const capital = (): number => (campaign ? LEVELS[0].capital : DIFFICULTIES[st.difficulty].capital);
+  const hubsOf = (country: string): Airport[] => (campaign ? hubsFor(data, country, 1) : data.airportsOfCountry(country));
 
   // ── Structure ──
   const root = document.createElement('section');
   root.className = 'g-sheet g-wizard';
   root.innerHTML = `
     <header class="g-sheet-head">
-      <h2 class="g-sheet-title">Nouvelle compagnie</h2>
+      <div class="g-wizard-top">
+        <h2 class="g-sheet-title">Nouvelle compagnie <small>${esc(modeText)}</small></h2>
+        <button type="button" class="g-icon-btn g-wizard-cancel" aria-label="Abandonner et revenir à l’accueil">${icon('close', 20)}</button>
+      </div>
       <ol class="g-steps"></ol>
     </header>
     <div class="g-body"></div>
     <footer class="g-wizard-foot">
-      <button type="button" class="g-btn ghost" data-nav="back">‹ Retour</button>
-      <button type="button" class="g-btn" data-nav="next">Suivant ›</button>
+      <button type="button" class="g-btn ghost" data-nav="back">${withIcon('back', 'Retour')}</button>
+      <button type="button" class="g-btn" data-nav="next"></button>
     </footer>
   `;
   const body = root.querySelector<HTMLElement>('.g-body')!;
   const stepsEl = root.querySelector<HTMLElement>('.g-steps')!;
   const backBtn = root.querySelector<HTMLButtonElement>('[data-nav=back]')!;
   const nextBtn = root.querySelector<HTMLButtonElement>('[data-nav=next]')!;
+  const cancelBtn = root.querySelector<HTMLButtonElement>('.g-wizard-cancel')!;
   document.body.appendChild(root);
   document.body.classList.add('wizard-on');
 
@@ -83,30 +115,37 @@ export function runWizard(deps: WizardDeps): void {
 
   function render(): void {
     // Aux étapes Pays et Premier hub, le panneau est plus bas pour laisser voir le globe.
-    root.dataset.step = String(st.step);
-    stepsEl.innerHTML = STEPS.map((s, i) => `<li class="${i === st.step ? 'on' : i < st.step ? 'done' : ''}" title="${s}"><span>${i + 1}</span><small>${s}</small></li>`).join('');
-    body.innerHTML = [renderCompany, renderCountry, renderCapital, renderHub][st.step]();
+    root.dataset.step = stepId();
+    stepsEl.innerHTML = steps
+      .map((id, i) => `<li class="${i === st.step ? 'on' : i < st.step ? 'done' : ''}" title="${STEP_LABEL[id]}"><span>${i < st.step ? icon('check', 14) : i + 1}</span><small>${STEP_LABEL[id]}</small></li>`)
+      .join('');
+    body.innerHTML = { company: renderCompany, country: renderCountry, capital: renderCapital, hub: renderHub }[stepId()]();
     body.scrollTop = 0;
     updateFooter();
   }
 
+  let footerKey = '';
   function updateFooter(): void {
     backBtn.style.visibility = st.step === 0 ? 'hidden' : 'visible';
-    nextBtn.textContent = st.step === 3 ? 'Acheter ce hub et démarrer' : 'Suivant ›';
+    const last = stepId() === 'hub';
+    if (footerKey !== stepId()) {
+      footerKey = stepId();
+      nextBtn.innerHTML = last ? withIcon('takeoff', 'Acheter ce hub et démarrer') : `<span>Suivant</span>${icon('chevron', 18)}`;
+    }
     nextBtn.disabled = !canGoOn();
   }
 
   function canGoOn(): boolean {
-    switch (st.step) {
-      case 0:
+    switch (stepId()) {
+      case 'company':
         return st.name.trim().length >= 2 && /^[A-Z0-9]{2}$/.test(st.code);
-      case 1:
+      case 'country':
         return st.country !== null;
-      case 2:
+      case 'capital':
         return true;
       default: {
-        const a = st.hub ? data.airportByIata.get(st.hub) : undefined;
-        return !!a && a.price <= DIFFICULTIES[st.difficulty].capital;
+        const a = st.hub && st.country ? hubsOf(st.country).find((x) => x.iata === st.hub) : undefined;
+        return !!a && a.price <= capital();
       }
     }
   }
@@ -120,7 +159,7 @@ export function runWizard(deps: WizardDeps): void {
     const symbolLogo = logo.kind === 'symbol' ? logo : null;
     return `
       ${deps.notice ? note(esc(deps.notice), 'warn') : ''}
-      <p class="g-lead">Bienvenue ! Crée ta compagnie aérienne. Tu choisiras ensuite ton pays, ton capital et ton premier hub.</p>
+      <p class="g-lead">${campaign ? 'Crée ta compagnie aérienne. Tu choisiras ensuite le pays où tout commence, puis ton premier hub : un petit aéroport régional.' : 'Crée ta compagnie aérienne. Tu choisiras ensuite ton pays, ton capital et ton premier hub.'}</p>
       <div class="g-preview" style="--company:${esc(st.color)}">
         <span class="g-preview-logo">${logoPreview(64)}</span>
         <span class="g-preview-text"><strong>${esc(st.name.trim() || 'Ma compagnie')}</strong><small>Vols ${esc(st.code || '··')} 100, ${esc(st.code || '··')} 101…</small></span>
@@ -145,7 +184,7 @@ export function runWizard(deps: WizardDeps): void {
         <div class="g-logo-colors">
           <label>Fond <input type="color" data-w="bg" value="${esc(symbolLogo?.bg ?? st.color)}"></label>
           <label>Dessin <input type="color" data-w="fg" value="${esc(symbolLogo?.fg ?? '#ffffff')}"></label>
-          <label class="g-btn ghost small g-file">🖼️ Importer une image<input type="file" accept="image/*" data-w="image"></label>
+          <label class="g-btn ghost small g-file">${withIcon('image', 'Importer une image', 16)}<input type="file" accept="image/*" data-w="image"></label>
           ${logo.kind === 'image' ? `<button type="button" class="g-btn ghost small" data-w="noImage">Retirer l’image</button>` : ''}
         </div>
       </div>
@@ -157,7 +196,7 @@ export function runWizard(deps: WizardDeps): void {
     return `<button type="button" class="g-row${c.code === st.country ? ' on' : ''}" data-w="country" data-v="${c.code}">
       <span class="g-row-icon g-flag">${flagEmoji(c.code)}</span>
       <span class="g-row-main"><span class="g-row-title">${esc(c.name)}</span>
-        <span class="g-row-sub">${num(data.airportsOfCountry(c.code).length)} aéroports · impôt ${tax === null ? '?' : num1(tax)}\u202f%</span></span>
+        <span class="g-row-sub">${campaign ? `${plural(hubsFor(data, c.code, 1).length, 'hub')} de départ` : `${num(data.airportsOfCountry(c.code).length)} aéroports`} · impôt ${tax === null ? '?' : num1(tax)}\u202f%</span></span>
       <span class="g-row-right">${compact(c.pax)} pass./an</span>
     </button>`;
   }
@@ -183,14 +222,14 @@ export function runWizard(deps: WizardDeps): void {
             ['Trafic du pays', `${compact(sel.pax)} passagers par an`],
             ['Prix des billets et salaires', `× ${coef.toFixed(2).replace('.', ',')} <small>(niveau de vie)</small>`],
           ])}
-          <p class="g-small">Tes hubs dans ce pays coûtent le prix normal ; ailleurs, 25\u202f% de plus.</p>
+          <p class="g-small">${campaign ? 'Tu y joueras le premier échelon. Aux échelons suivants, tu changeras de pays.' : 'Tes hubs dans ce pays coûtent le prix normal ; ailleurs, 25\u202f% de plus.'}</p>
         </div>`;
     }
     return `
-      <p class="g-lead">Où installer le siège ? Le pays fixe tes impôts et la liste des hubs possibles. <b>Touche un pays sur le globe</b> ou cherche-le.</p>
+      <p class="g-lead">${campaign ? 'Dans quel pays commencer ? Il fixe tes impôts et tes premiers aéroports.' : 'Où installer le siège ? Le pays fixe tes impôts et la liste des hubs possibles.'} <b>Touche un pays sur le globe</b> ou cherche-le.</p>
       ${details}
       <input class="g-input" type="search" data-w="countrySearch" placeholder="Rechercher un pays…" value="${esc(st.countrySearch)}">
-      <p class="g-small">${q ? `${list.length} résultat(s)` : 'Classés par trafic aérien'}</p>
+      <p class="g-small">${q ? `${plural(list.length, 'résultat')}` : 'Classés par trafic aérien'}</p>
       <div class="g-list">${list.map(countryRow).join('')}</div>
     `;
   }
@@ -209,8 +248,8 @@ export function runWizard(deps: WizardDeps): void {
     `;
   }
 
-  function hubRow(a: Airport, capital: number): string {
-    const tooExpensive = a.price > capital;
+  function hubRow(a: Airport, cap: number): string {
+    const tooExpensive = a.price > cap;
     return `<button type="button" class="g-row${a.iata === st.hub ? ' on' : ''}${tooExpensive ? ' dim' : ''}" data-w="hub" data-v="${a.iata}">
       <span class="g-row-icon g-rank">${a.rankCountry}</span>
       <span class="g-row-main"><span class="g-row-title">${esc(a.city || a.name)} <small>${a.iata}</small></span>
@@ -220,36 +259,38 @@ export function runWizard(deps: WizardDeps): void {
   }
 
   function renderHub(): string {
-    const capital = DIFFICULTIES[st.difficulty].capital;
-    const all = data.airportsOfCountry(st.country!);
+    const cap = capital();
+    const all = hubsOf(st.country!);
     const q = fold(st.hubSearch.trim());
     const list = q ? all.filter((a) => fold(`${a.city} ${a.name} ${a.iata}`).includes(q)) : all;
     const shown = list.slice(0, LIST_LIMIT);
-    const a = st.hub ? data.airportByIata.get(st.hub) : undefined;
+    const a = st.hub ? all.find((x) => x.iata === st.hub) : undefined;
     let details = '';
     if (a) {
       const routes = data.routesFrom(a.iata).length;
+      const home = domesticDests(data, a.iata).length;
       details = `
         <div class="g-card g-selected">
           <h3 class="g-h3">${esc(a.name)} <small>${a.iata}</small></h3>
           ${kv([
             ['Prix', `<b>${money(a.price)}</b>`],
-            ['Il te restera', a.price <= capital ? money(capital - a.price) : `<span class="neg">il manque ${money(a.price - capital)}</span>`],
+            ['Il te restera', a.price <= cap ? money(cap - a.price) : `<span class="neg">il manque ${money(a.price - cap)}</span>`],
           ])}
-          ${a.price <= capital && capital - a.price < FIRST_HUB_MIN_LEFT ? note('Il ne te resterait presque rien pour acheter un avion : choisis plutôt un hub moins cher.', 'warn') : ''}
+          ${a.price <= cap && cap - a.price < (campaign ? cap * 0.4 : FIRST_HUB_MIN_LEFT) ? note('Il ne te resterait presque rien pour acheter un avion : choisis plutôt un hub moins cher.', 'warn') : ''}
           ${kv([
             ['Taille', `${TIER_LABEL[a.tier]} · n° ${a.rank} mondial`],
             ['Passagers par an', num(a.pax)],
-            ['Destinations réelles', num(routes)],
-            ['Pour commencer', `${Math.min(HUB_START.gates[a.tier], Math.max(1, a.gates))} porte(s), ${Math.min(HUB_START.lineSlots[a.tier], routes)} licences de lignes, ${HUB_START.parking[a.tier]} places de parking`],
+            campaign ? ['Lignes intérieures possibles', num(home)] : ['Destinations réelles', num(routes)],
+            ...(campaign ? ([['Premier objectif', `relier ${levelGoals(data, 1, a.iata).airports} aéroports du pays`]] as [string, string][]) : []),
+            ['Pour commencer', `${plural(Math.min(HUB_START.gates[a.tier], Math.max(1, a.gates)), 'porte')}, ${plural(Math.min(HUB_START.lineSlots[a.tier], routes), 'licence')} de lignes, ${plural(HUB_START.parking[a.tier], 'place')} de parking`],
           ])}
         </div>`;
     }
     return `
-      <p class="g-lead">Ton premier hub, parmi les vrais aéroports du pays. Plus il y a de trafic, plus il coûte cher… et plus il rapporte.</p>
+      <p class="g-lead">${campaign ? `Ton premier hub : tu démarres avec <b>${money(cap)}</b>, de quoi acheter un petit aéroport et deux avions à hélices.` : 'Ton premier hub, parmi les vrais aéroports du pays. Plus il y a de trafic, plus il coûte cher… et plus il rapporte.'}</p>
       ${details}
       ${all.length > 12 ? `<input class="g-input" type="search" data-w="hubSearch" placeholder="Rechercher une ville, un aéroport…" value="${esc(st.hubSearch)}">` : ''}
-      <div class="g-list">${shown.map((x) => hubRow(x, capital)).join('')}</div>
+      <div class="g-list">${shown.map((x) => hubRow(x, cap)).join('')}</div>
       ${list.length > shown.length ? `<p class="g-small">… et ${list.length - shown.length} autres : précise ta recherche.</p>` : ''}
     `;
   }
@@ -263,7 +304,7 @@ export function runWizard(deps: WizardDeps): void {
       st.hubSearch = '';
     }
     if (fly) {
-      const top = data.airportsOfCountry(code)[0];
+      const top = hubsOf(code)[0] ?? data.airportsOfCountry(code)[0];
       if (top) map.flyTo({ center: [top.lon, top.lat], zoom: 3.6, padding: mapPadding(), duration: 1500 });
     }
     render();
@@ -284,10 +325,12 @@ export function runWizard(deps: WizardDeps): void {
       .routesFrom(iata)
       .slice()
       .sort((x, y) => y.demand - x.demand)
-      .slice(0, 80)
-      .map((r) => data.airport(r.a === iata ? r.b : r.a));
+      .map((r) => data.airport(r.a === iata ? r.b : r.a))
+      // Mode par échelons : on commence par des lignes intérieures.
+      .filter((x) => !campaign || x.country === a.country)
+      .slice(0, 80);
     network.setPreview({ focus: a, dests });
-    map.flyTo({ center: [a.lon, a.lat], zoom: 4, padding: mapPadding(), duration: 1500 });
+    map.flyTo({ center: [a.lon, a.lat], zoom: campaign ? 4.6 : 4, padding: mapPadding(), duration: 1500 });
     render();
   }
 
@@ -408,24 +451,26 @@ export function runWizard(deps: WizardDeps): void {
     body.insertAdjacentHTML('afterbegin', `<p class="g-note bad g-inline-alert">${esc(text)}</p>`);
   }
 
-  backBtn.addEventListener('click', () => {
+  function goBack(): void {
     if (st.step === 0) return;
     st.step--;
-    if (st.step < 3) network.setPreview(null);
+    if (stepId() !== 'hub') network.setPreview(null);
     render();
-  });
+  }
+
+  backBtn.addEventListener('click', goBack);
 
   nextBtn.addEventListener('click', () => {
     if (!canGoOn()) return;
-    if (st.step < 3) {
+    if (stepId() !== 'hub') {
       st.step++;
       render();
-      if (st.step === 1 && !st.country) showGlobe();
-      if (st.step === 3 && !st.hub) {
+      if (stepId() === 'country' && !st.country) showGlobe();
+      if (stepId() === 'hub' && !st.hub) {
         // Propose d'emblée le plus grand hub qui laisse de quoi acheter des avions.
-        const capital = DIFFICULTIES[st.difficulty].capital;
-        const airports = data.airportsOfCountry(st.country!);
-        const best = airports.find((a) => a.price <= capital * FIRST_HUB_BUDGET_SHARE) ?? airports.find((a) => a.price <= capital);
+        const cap = capital();
+        const airports = hubsOf(st.country!);
+        const best = airports.find((a) => a.price <= cap * FIRST_HUB_BUDGET_SHARE) ?? airports.find((a) => a.price <= cap);
         if (best) selectHub(best.iata);
       }
       return;
@@ -433,12 +478,45 @@ export function runWizard(deps: WizardDeps): void {
     finish();
   });
 
+  // Abandonner : un premier toucher demande confirmation (le bouton change), le second ferme.
+  let cancelArmed = 0;
+  cancelBtn.addEventListener('click', () => {
+    const typed = st.name.trim().length > 0;
+    if (typed && !cancelArmed) {
+      cancelBtn.classList.add('armed');
+      cancelBtn.innerHTML = '<span>Abandonner ?</span>';
+      cancelArmed = window.setTimeout(() => {
+        cancelArmed = 0;
+        cancelBtn.classList.remove('armed');
+        cancelBtn.innerHTML = icon('close', 20);
+      }, 3000);
+      return;
+    }
+    cancel();
+  });
+
   // Toucher un pays sur le globe pendant l'étape « Pays ».
   const offCountry = countries.onSelect((c) => {
-    if (!c || st.step !== 1) return;
+    if (!c || stepId() !== 'country') return;
     if (playableSet.has(c.iso)) selectCountry(c.iso, false);
+    else if (campaign && data.playableCountries().some((x) => x.code === c.iso)) alertInline(`${c.nom} : aucun petit hub assez bien relié au reste du pays pour le premier échelon.`);
     else alertInline(`${c.nom} : aucun aéroport avec des lignes régulières dans nos données.`);
   });
+
+  function close(): void {
+    window.clearTimeout(cancelArmed);
+    offCountry();
+    countries.clearSelection();
+    network.setPreview(null);
+    root.remove();
+    document.body.classList.remove('wizard-on');
+  }
+
+  function cancel(): void {
+    if (!root.isConnected) return;
+    close();
+    deps.onCancel();
+  }
 
   function finish(): void {
     const params: NewGameParams = {
@@ -449,14 +527,19 @@ export function runWizard(deps: WizardDeps): void {
       country: st.country!,
       difficulty: st.difficulty,
       hub: st.hub!,
+      mode: deps.mode,
+      competition: deps.competition,
     };
-    offCountry();
-    countries.clearSelection();
-    network.setPreview(null);
-    root.remove();
-    document.body.classList.remove('wizard-on');
+    close();
     deps.onDone(params);
   }
 
   render();
+  // Panneau sur le côté (ordinateur, téléphone couché) : le globe se place dans la partie de l'écran restée libre.
+  if (sidePanel()) showGlobe();
+  return {
+    // À la première étape, comme le bouton ✕ : un nom déjà écrit demande une confirmation.
+    back: () => (st.step === 0 ? cancelBtn.click() : goBack()),
+    cancel,
+  };
 }

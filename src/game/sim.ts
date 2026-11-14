@@ -35,6 +35,8 @@ import {
   REPAIR_MINOR,
   loanRate,
 } from './config';
+import { evaluate } from './campaign';
+import { dailyCompetition, demandContext } from './competition';
 import { invalidate, log, type Ctx } from './context';
 import {
   ageYears,
@@ -74,6 +76,7 @@ export function advance(ctx: Ctx, to: number): void {
     s.time = Math.max(s.time, to);
     return;
   }
+  let happened = false;
   for (let guard = 0; guard < 5_000_000; guard++) {
     let best = Infinity;
     let kind = 0;
@@ -110,8 +113,12 @@ export function advance(ctx: Ctx, to: number): void {
     else if (kind === 2) onMonth(ctx, t);
     else if (kind === 3) onTrainingDone(ctx, pilot!, t);
     else onAircraftEvent(ctx, aircraft!, t);
+    happened = true;
     if (s.bankrupt) break;
   }
+  // Mode par échelons : un objectif atteint est annoncé tout de suite (le vol qui
+  // le fait basculer vient d'atterrir), sans attendre la fin de la journée.
+  if (happened && s.campaign) evaluate(ctx, s.time);
   s.time = Math.max(s.time, to);
 }
 
@@ -281,14 +288,7 @@ export function depart(ctx: Ctx, ac: Aircraft, from: string, to: string, line: L
   const route = line ? data.route(line.hub, line.dest) : undefined;
   if (line && route) {
     const freq = lineFrequency(ctx, line.id);
-    const dctx = {
-      route,
-      line,
-      hub: s.hubs.find((h) => h.iata === line.hub),
-      reputation: s.reputation,
-      condition: ac.condition,
-      legsPerDay: model.kind === 'pax' ? freq.pax : freq.cargo,
-    };
+    const dctx = demandContext(ctx, line, route, ac.condition, model.kind === 'pax' ? freq.pax : freq.cargo, t);
     const noise = 0.85 + 0.3 * rng();
     if (model.kind === 'pax') {
       const perLeg = playerPaxPerDay(dctx) / Math.max(1, freq.pax);
@@ -539,6 +539,7 @@ function onDay(ctx: Ctx, t: number): void {
   spend(s, 'interest', interest);
 
   if (t - s.market.refreshedAt >= MARKET_REFRESH_DAYS * DAY) refreshMarkets(ctx, t);
+  dailyCompetition(ctx, t);
 
   if (s.cash < 0) {
     s.negativeSince ??= t;
@@ -558,6 +559,7 @@ function onDay(ctx: Ctx, t: number): void {
   } else {
     s.negativeSince = null;
   }
+  evaluate(ctx, t);
   s.nextDay = t + DAY;
 }
 

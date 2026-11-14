@@ -1,7 +1,8 @@
 /**
  * Pilotes : candidats au recrutement, salaires, formations.
  */
-import { MIN_STARS, PILOT_MARKET_SIZE, PILOT_SALARY, PILOT_SIGNING_MONTHS, PILOT_STAR_HOURS, TRAINING_COST, TYPE_RATING } from './config';
+import { MIN_STARS, PILOT_MARKET_SIZE, PILOT_SALARY, PILOT_SIGNING_MONTHS, PILOT_STAR_HOURS, TRAINING_COST, TRAINING_DAYS, TYPE_RATING } from './config';
+import { limits } from './campaign';
 import type { Ctx } from './context';
 import type { AircraftModel, GameData } from './data';
 import { starsFromHours } from './economy';
@@ -50,9 +51,30 @@ export function trainingCost(data: GameData, state: GameState): number {
   return Math.round((TRAINING_COST * data.coef(state.company.country)) / 1000) * 1000;
 }
 
+/**
+ * Formation initiale d'un élève pilote : coût et durée. En mode par échelons,
+ * on ne peut pas toujours recruter : la formation y est deux fois plus rapide,
+ * et encore deux fois plus (à moitié prix) avec l'école de pilotes.
+ */
+export function initialTraining(data: GameData, state: GameState): { cost: number; days: number } {
+  const lim = limits(state);
+  let cost = trainingCost(data, state);
+  let days = TRAINING_DAYS;
+  if (lim) days = Math.round(days / 2);
+  if (lim?.school) {
+    days = Math.round(days / 2);
+    cost = Math.round(cost / 2000) * 1000;
+  }
+  return { cost, days };
+}
+
 export function typeRatingSpec(data: GameData, state: GameState, family: string): { cost: number; days: number } {
   const spec = data.families.get(family)?.large ? TYPE_RATING.large : TYPE_RATING.small;
-  return { cost: Math.round((spec.cost * data.coef(state.company.country)) / 1000) * 1000, days: spec.days };
+  const school = limits(state)?.school ? 0.5 : 1;
+  return {
+    cost: Math.round((spec.cost * data.coef(state.company.country) * school) / 1000) * 1000,
+    days: Math.max(1, Math.round(spec.days * school)),
+  };
 }
 
 function randomHours(rng: Rng): number {

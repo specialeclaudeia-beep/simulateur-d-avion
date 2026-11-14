@@ -15,23 +15,26 @@ import {
   PILOT_SEVERANCE_MONTHS,
   PRICE_FACTOR_MAX,
   PRICE_FACTOR_MIN,
-  TRAINING_DAYS,
   DAY,
   HOUR,
   USED_DELIVERY_HOURS,
 } from './config';
+import { PERKS, limits, modelProblem } from './campaign';
 import { fail, invalidate, log, ok, type ActionResult, type Ctx } from './context';
 import { GameData } from './data';
-import { aircraftValue, blockMinutes, pilotProblem, routeProblem } from './economy';
+import { aircraftValue, blockMinutes, pilotProblem, routeProblem, starsFromHours } from './economy';
 import { orderQuote } from './fleet';
-import { HUB_UPGRADE_LABEL, hubPrice, hubResale, hubValue, newHub, upgradeInfo, type HubUpgrade } from './hubs';
+import { HUB_UPGRADE_LABEL, hubPrice, hubResale, newHub, upgradeInfo, type HubUpgrade } from './hubs';
 import { earn, money, spend } from './ledger';
 import { randomName, namePoolFor, randomRegistration } from './names';
-import { baseSalary, ensureQualifiedCandidate, pilotName, takenFirstNames, trainingCost, typeRatingSpec } from './pilots';
+import { baseSalary, ensureQualifiedCandidate, initialTraining, pilotName, takenFirstNames, typeRatingSpec } from './pilots';
 import { aircraftDailyDepartures, basedAircraft, hubDepartures, programLines } from './schedule';
 import { isPlayerHub, maintenanceQuote, planNext, repairQuote, startMaintenance, startRepair } from './sim';
 import { emptyStats, type Aircraft, type Hub, type Line, type Pilot } from './state';
 import { utcYear } from './time';
+import { companyAssets } from './value';
+
+export { companyAssets, companyValue } from './value';
 
 // ───────────────────────── Outils ─────────────────────────
 
@@ -75,6 +78,13 @@ export function buyHub(ctx: Ctx, t: number, iata: string): ActionResult {
   if (!a) return fail('Aéroport inconnu.');
   if (findHub(ctx, iata)) return fail(`${a.name} est déjà un de tes hubs.`);
   if (!data.routesFrom(iata).length) return fail(`${a.name} n'a aucune ligne régulière.`);
+  const lim = limits(s);
+  if (lim) {
+    if (a.country !== s.company.country) return fail('En mode par échelons, tes hubs restent dans le pays de l’échelon.');
+    if (s.hubs.length >= lim.hubs) {
+      return fail(`${lim.hubs > 1 ? `${lim.hubs} hubs au plus` : 'Un seul hub'} à cet échelon : l’amélioration « ${PERKS.hub.title} » en ouvre un de plus.`);
+    }
+  }
   const price = hubPrice(s, a);
   const no = cantAfford(ctx, price);
   if (no) return no;
@@ -101,8 +111,12 @@ export function sellHub(ctx: Ctx, t: number, iata: string): ActionResult {
 export function upgradeHub(ctx: Ctx, t: number, iata: string, kind: HubUpgrade): ActionResult {
   const hub = findHub(ctx, iata);
   if (!hub) return fail('Ce hub ne t’appartient pas.');
-  const info = upgradeInfo(ctx.data, hub, kind);
-  if (!info) return fail('Déjà au maximum.');
+  const lim = limits(ctx.state);
+  const info = upgradeInfo(ctx.data, hub, kind, lim);
+  if (!info) {
+    const capped = lim && upgradeInfo(ctx.data, hub, kind) !== null;
+    return fail(capped ? 'Niveau maximal à cet échelon : il montera avec l’échelon suivant ou une amélioration.' : 'Déjà au maximum.');
+  }
   const no = cantAfford(ctx, info.cost);
   if (no) return no;
   spend(ctx.state, 'upgrades', info.cost);
@@ -154,8 +168,11 @@ export function orderAircraft(ctx: Ctx, t: number, modelId: string, qty: number,
   if (!model) return fail('Modèle inconnu.');
   if (!model.inProduction) return fail(`Le ${model.name} n'est plus fabriqué : cherche-le sur le marché de l'occasion.`);
   if (!Number.isInteger(qty) || qty < 1 || qty > 30) return fail('Commande entre 1 et 30 avions.');
+  const locked = modelProblem(s, model) ?? fleetProblem(ctx, qty);
+  if (locked) return fail(locked);
   if (!findHub(ctx, base)) return fail('Choisis un de tes hubs pour la livraison.');
-  if (parkingLeft(ctx, base) < qty) return fail(`Pas assez de place au parking de ${city(ctx, base)} (${parkingLeft(ctx, base)} place(s) libre(s)).`);
+  const free = parkingLeft(ctx, base);
+  if (free < qty) return fail(`Pas assez de place au parking de ${city(ctx, base)} (${free > 1 ? `${free} places libres` : free === 1 ? '1 place libre' : 'aucune place libre'}).`);
   const q = orderQuote(data, s, model, qty, t);
   const no = cantAfford(ctx, q.total);
   if (no) return no;
@@ -174,6 +191,8 @@ export function buyUsed(ctx: Ctx, t: number, listingId: string, base: string): A
   const { data, state: s } = ctx;
   const listing = s.market.used.find((l) => l.id === listingId);
   if (!listing) return fail('Cette annonce n’est plus disponible.');
+  const locked = modelProblem(s, data.model(listing.modelId)) ?? fleetProblem(ctx, 1);
+  if (locked) return fail(locked);
   if (!findHub(ctx, base)) return fail('Choisis un de tes hubs pour la livraison.');
   if (parkingLeft(ctx, base) < 1) return fail(`Plus de place au parking de ${city(ctx, base)}.`);
   const no = cantAfford(ctx, listing.price);
@@ -196,10 +215,53 @@ export function buyUsed(ctx: Ctx, t: number, listingId: string, base: string): A
   return ok('Avion acheté : il arrive à son hub d’ici un jour et demi.');
 }
 
+/** Mode par échelons : la flotte est limitée (elle grandit avec les échelons et les améliorations). */
+function fleetProblem(ctx: Ctx, qty: number): string | null {
+  const lim = limits(ctx.state);
+  const have = ctx.state.aircraft.length;
+  if (!lim || have + qty <= lim.fleet) return null;
+  return `Flotte limitée à ${lim.fleet} avions à cet échelon (tu en as ${have}). L’amélioration « ${PERKS.fleet.title} » ou l’échelon suivant en autorisent plus.`;
+}
+
 /** Premier avion d'une famille : un pilote qualifié se présente (voir ensureQualifiedCandidate). */
 function offerPilotFor(ctx: Ctx, t: number, family: string): void {
+  const s = ctx.state;
+  const lim = limits(s);
+  if (lim && !lim.recruit) {
+    // Sans bureau de recrutement : le tout premier avion arrive avec le pilote fondateur, les autres se forment.
+    if (!s.pilots.length) {
+      const p = founderPilot(ctx, t, family);
+      log(ctx, 'good', `${pilotName(p)}, pilote qualifié(e) ${family}, rejoint l’aventure : c’est ton premier pilote. Les suivants se forment (onglet Pilotes).`, { type: 'pilot', id: p.id }, t);
+    } else if (!s.pilots.some((p) => p.ratings.includes(family) || p.training?.family === family)) {
+      log(ctx, 'info', `Aucun de tes pilotes n’est qualifié ${family} : forme un élève ou qualifie un pilote (onglet Pilotes).`, undefined, t);
+    }
+    return;
+  }
   const c = ensureQualifiedCandidate(ctx, t, family);
   if (c) log(ctx, 'good', `${pilotName(c)}, pilote qualifié(e) ${family}, propose ses services : onglet Pilotes, « Recruter ».`, undefined, t);
+}
+
+/** Le premier pilote d'une compagnie du mode par échelons : expérimenté, et qui la suit de pays en pays. */
+function founderPilot(ctx: Ctx, t: number, family: string): Pilot {
+  const { data, state: s } = ctx;
+  const country = s.company.country;
+  const hours = 2_000;
+  const stars = starsFromHours(hours);
+  const p: Pilot = {
+    id: `P${++s.counters.pilot}`,
+    ...randomName(ctx.rng, namePoolFor(country, data.country(country)?.continent), takenFirstNames(ctx)),
+    nationality: country,
+    birthYear: utcYear(t) - 34,
+    hours,
+    stars,
+    ratings: [family],
+    salary: Math.round(baseSalary(data, s, stars) / 100) * 100,
+    hiredAt: t,
+    aircraftId: null,
+    training: null,
+  };
+  s.pilots.push(p);
+  return p;
 }
 
 /** Prix de revente proposé (5 % de frais de courtage, moins s'il est en panne). */
@@ -312,6 +374,15 @@ export function openLine(ctx: Ctx, t: number, hubIata: string, dest: string): Ac
   if (!route) return fail('Aucune ligne régulière n’existe entre ces deux aéroports.');
   const key = GameData.routeKey(hubIata, dest);
   if (s.lines.some((l) => GameData.routeKey(l.hub, l.dest) === key)) return fail('Tu exploites déjà cette ligne.');
+  const lim = limits(s);
+  if (lim) {
+    if (!lim.intl && data.airport(dest).country !== s.company.country) {
+      return fail(`À cet échelon, tes lignes restent dans le pays. L’amélioration « ${PERKS.intl.title} » ouvre l’étranger.`);
+    }
+    if (s.lines.length >= lim.lines) {
+      return fail(`Nombre de lignes limité à ${lim.lines} à cet échelon. L’amélioration « ${PERKS.lines.title} » ou l’échelon suivant en autorisent plus.`);
+    }
+  }
   const used = s.lines.filter((l) => l.hub === hubIata).length;
   if (used >= hub.lineSlots) return fail(`Toutes les licences de lignes de ${city(ctx, hubIata)} sont utilisées (${used}/${hub.lineSlots}). Achète une licence de plus au hub.`);
   const cost = lineOpeningCost(route.km);
@@ -456,6 +527,8 @@ export function hirePilot(ctx: Ctx, t: number, candidateId: string): ActionResul
   const s = ctx.state;
   const c = s.market.pilots.find((x) => x.id === candidateId);
   if (!c) return fail('Ce pilote n’est plus disponible.');
+  const lim = limits(s);
+  if (lim && !lim.recruit) return fail(`Le recrutement de pilotes expérimentés se débloque avec l’amélioration « ${PERKS.recruit.title} ». En attendant, forme tes pilotes.`);
   const no = cantAfford(ctx, c.signingFee);
   if (no) return no;
   spend(s, 'recruitment', c.signingFee);
@@ -485,7 +558,7 @@ export function trainNewPilot(ctx: Ctx, t: number, family: string): ActionResult
   const fam = data.families.get(family);
   if (!fam) return fail('Famille d’avions inconnue.');
   if (fam.large) return fail('Un débutant commence sur un avion régional ou moyen-courrier.');
-  const cost = trainingCost(data, s);
+  const { cost, days } = initialTraining(data, s);
   const no = cantAfford(ctx, cost);
   if (no) return no;
   spend(s, 'training', cost);
@@ -502,11 +575,11 @@ export function trainNewPilot(ctx: Ctx, t: number, family: string): ActionResult
     salary: Math.round((PILOT_SALARY[1] * 0.8 * data.coef(country)) / 100) * 100,
     hiredAt: t,
     aircraftId: null,
-    training: { kind: 'initial', family, until: t + TRAINING_DAYS * DAY },
+    training: { kind: 'initial', family, until: t + days * DAY },
   };
   s.pilots.push(p);
-  log(ctx, 'info', `${pilotName(p)} commence sa formation de pilote (${family}, ${TRAINING_DAYS} jours)`, { type: 'pilot', id: p.id }, t);
-  return ok(`Formation lancée : ${pilotName(p)} sera pilote dans ${TRAINING_DAYS} jours.`);
+  log(ctx, 'info', `${pilotName(p)} commence sa formation de pilote (${family}, ${days} jours)`, { type: 'pilot', id: p.id }, t);
+  return ok(`Formation lancée : ${pilotName(p)} sera pilote dans ${days} jours.`);
 }
 
 /** Qualification d'un pilote sur une autre famille d'avions. */
@@ -552,17 +625,6 @@ export function juniorSalary(ctx: Ctx): number {
 }
 
 // ───────────────────────── Finances ─────────────────────────
-
-export function companyAssets(ctx: Ctx, t: number): { fleet: number; hubs: number } {
-  const fleet = ctx.state.aircraft.reduce((sum, ac) => sum + aircraftValue(ctx.data, ac, t), 0);
-  const hubs = ctx.state.hubs.reduce((sum, h) => sum + hubValue(h), 0);
-  return { fleet, hubs };
-}
-
-export function companyValue(ctx: Ctx, t: number): number {
-  const a = companyAssets(ctx, t);
-  return ctx.state.cash - ctx.state.debt + a.fleet + a.hubs;
-}
 
 export function loanCapacity(ctx: Ctx, t: number): number {
   const a = companyAssets(ctx, t);

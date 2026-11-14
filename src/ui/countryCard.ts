@@ -1,5 +1,6 @@
 import type { Countries, CountryInfo } from '../map/countries';
 import { flagEmoji } from '../map/countries';
+import { icon } from './icons';
 
 /** Petite fiche en bas de l'écran pour le pays touché. */
 export function mountCountryCard(root: HTMLElement, countries: Countries): void {
@@ -20,7 +21,7 @@ export function mountCountryCard(root: HTMLElement, countries: Countries): void 
         <strong>${escapeHtml(c.nom)}</strong>
         <small>Pays sélectionné</small>
       </div>
-      <button type="button" class="hud-btn country-close" aria-label="Fermer">✕</button>
+      <button type="button" class="hud-btn country-close" aria-label="Fermer">${icon('close', 18)}</button>
     `;
     card.querySelector('.country-close')!.addEventListener('click', () => countries.clearSelection());
   });

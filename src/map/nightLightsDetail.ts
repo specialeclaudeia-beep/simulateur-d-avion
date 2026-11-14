@@ -1,15 +1,14 @@
-import type { CanvasSource, Map as MapLibreMap } from 'maplibre-gl';
-import { sunAltitudeSin, type SubsolarPoint } from '../core/sun';
-import { SLOT } from './layerSlots';
+import type { Map as MapLibreMap } from 'maplibre-gl';
+import type { NightGl } from './nightGl';
 
 /**
  * Lumières nocturnes détaillées pour les vues rapprochées.
  *
- * L'image mondiale (2048 px) devient floue et pixelisée dès qu'on zoome. Ici, on
- * charge pour la zone affichée les tuiles NASA « Black Marble » (GIBS, domaine
- * public) au niveau de détail adapté au zoom (jusqu'à ~500 m par pixel), on en
- * extrait les lumières, puis on n'affiche que la partie où il fait nuit,
- * exactement comme pour la vue globale.
+ * L'image mondiale (2048 px) devient floue dès qu'on zoome. Ici, on charge pour
+ * la zone affichée les tuiles NASA « Black Marble » (GIBS, domaine public) au
+ * niveau de détail adapté au zoom (jusqu'à ~500 m par pixel) et on en extrait
+ * les lumières, une fois par tuile. Le calque de la nuit (nightGl.ts) les
+ * affiche là où il fait nuit : aucun recalcul quand le soleil bouge.
  */
 
 const TILE_URL =
@@ -18,10 +17,7 @@ const TILE = 256;
 const MAX_TILE_ZOOM = 8; // niveau le plus fin publié par la NASA
 const MAX_TILES = 48; // ~12 Mo de pixels au maximum
 const MIN_ZOOM = 3; // en dessous, l'image mondiale suffit
-const MASK_PER_TILE = 32; // résolution du masque jour/nuit (le dégradé est doux)
 const DEG = Math.PI / 180;
-const LIGHTS_ON = -1;
-const LIGHTS_FULL = -7;
 
 interface Region {
   z: number;
@@ -32,62 +28,31 @@ interface Region {
 }
 
 export class NightLightsDetail {
-  /** Lumières extraites (couleur + transparence), sans le masque de nuit. */
-  private raw = document.createElement('canvas');
-  /** Ce qui est affiché : lumières × nuit. */
-  private out = document.createElement('canvas');
-  private mask = document.createElement('canvas');
   private region: Region | null = null;
   private requestId = 0;
-  private sun: SubsolarPoint | null = null;
-  private tileCache = new Map<string, Promise<HTMLImageElement | null>>();
+  private enabled = true;
+  /** Tuiles déjà chargées, lumières extraites (null : tuile indisponible). */
+  private tileCache = new Map<string, Promise<HTMLCanvasElement | null>>();
 
-  constructor(private map: MapLibreMap) {
-    this.out.width = this.out.height = 1;
-    this.raw.width = this.raw.height = 1;
-  }
+  constructor(
+    private map: MapLibreMap,
+    private night: NightGl,
+  ) {}
 
-  async install(): Promise<void> {
-    const map = this.map;
-    map.addSource('night-lights-detail', {
-      type: 'canvas',
-      canvas: this.out,
-      coordinates: [
-        [0, 1],
-        [1, 1],
-        [1, 0],
-        [0, 0],
-      ],
-      animate: false,
-    });
-    map.addLayer(
-      {
-        id: 'night-lights-detail',
-        type: 'raster',
-        source: 'night-lights-detail',
-        minzoom: MIN_ZOOM,
-        maxzoom: 10.5,
-        layout: { visibility: 'none' },
-        paint: {
-          'raster-fade-duration': 0,
-          'raster-resampling': 'linear',
-          'raster-opacity': ['interpolate', ['linear'], ['zoom'], MIN_ZOOM, 0, 4.2, 1, 6.5, 0.85, 8.5, 0.65, 10.2, 0],
-        },
-      },
-      SLOT.night,
-    );
-    map.on('moveend', () => void this.loadRegion());
+  install(): void {
+    this.map.on('moveend', () => void this.loadRegion());
     void this.loadRegion();
   }
 
-  /** Nouvelle position du soleil : on recalcule seulement le masque (rapide). */
-  update(sun: SubsolarPoint): void {
-    this.sun = sun;
-    if (!this.region) return;
-    this.compose();
+  setEnabled(on: boolean): void {
+    this.enabled = on;
+    this.night.detailEnabled = on;
+    if (on) void this.loadRegion();
+    else this.map.triggerRepaint();
   }
 
   private async loadRegion(): Promise<void> {
+    if (!this.enabled) return;
     const zoom = this.map.getZoom();
     if (zoom < MIN_ZOOM) return;
     const region = this.computeRegion(zoom);
@@ -98,76 +63,25 @@ export class NightLightsDetail {
       Array.from({ length: region.cols * region.rows }, (_, i) => {
         const cx = i % region.cols;
         const cy = Math.floor(i / region.cols);
-        return this.loadTile(region.z, region.x0 + cx, region.y0 + cy).then((img) => ({ img, cx, cy }));
+        return this.loadTile(region.z, region.x0 + cx, region.y0 + cy).then((image) => ({ image, x: cx * TILE, y: cy * TILE }));
       }),
     );
     if (id !== this.requestId) return; // une zone plus récente a été demandée
 
-    const w = region.cols * TILE;
-    const h = region.rows * TILE;
-    const raw = document.createElement('canvas');
-    raw.width = w;
-    raw.height = h;
-    const ctx = raw.getContext('2d', { willReadFrequently: true })!;
-    for (const { img, cx, cy } of tiles) if (img) ctx.drawImage(img, cx * TILE, cy * TILE);
-    extractLights(ctx, w, h);
-    this.raw = raw;
     this.region = region;
-    this.out.width = w;
-    this.out.height = h;
-    this.mask.width = region.cols * MASK_PER_TILE;
-    this.mask.height = region.rows * MASK_PER_TILE;
-
-    const src = this.map.getSource('night-lights-detail') as CanvasSource | undefined;
-    if (!src) return;
-    src.setCoordinates(regionCorners(region));
-    this.map.setLayoutProperty('night-lights-detail', 'visibility', 'visible');
-    this.compose();
-  }
-
-  /** Lumières × masque de nuit, puis envoi au GPU. */
-  private compose(): void {
-    const region = this.region;
-    const sun = this.sun;
-    if (!region || !sun) return;
-
-    // Masque : on évalue la hauteur du soleil sur une petite grille.
-    const mw = this.mask.width;
-    const mh = this.mask.height;
-    const mctx = this.mask.getContext('2d')!;
-    const data = mctx.createImageData(mw, mh);
-    const a = Math.sin(LIGHTS_ON * DEG);
-    const b = Math.sin(LIGHTS_FULL * DEG);
     const n = 2 ** region.z;
-    for (let y = 0; y < mh; y++) {
-      const lat = tileYToLat(region.y0 + ((y + 0.5) / mh) * region.rows, n);
-      for (let x = 0; x < mw; x++) {
-        const lon = tileXToLon(region.x0 + ((x + 0.5) / mw) * region.cols, n);
-        const t = (a - sunAltitudeSin(lat, lon, sun)) / (a - b);
-        data.data[(y * mw + x) * 4 + 3] = t <= 0 ? 0 : t >= 1 ? 255 : t * t * (3 - 2 * t) * 255;
-      }
-    }
-    mctx.putImageData(data, 0, 0);
-
-    const ctx = this.out.getContext('2d')!;
-    ctx.globalCompositeOperation = 'copy';
-    ctx.drawImage(this.raw, 0, 0);
-    ctx.globalCompositeOperation = 'destination-in';
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(this.mask, 0, 0, this.out.width, this.out.height);
-    ctx.globalCompositeOperation = 'source-over';
-
-    const src = this.map.getSource('night-lights-detail') as CanvasSource | undefined;
-    if (src && typeof src.play === 'function') {
-      src.play();
-      src.pause();
-    }
+    this.night.setDetail({
+      bounds: [region.x0 / n, region.y0 / n, (region.x0 + region.cols) / n, (region.y0 + region.rows) / n],
+      width: region.cols * TILE,
+      height: region.rows * TILE,
+      tiles: tiles.filter((t): t is { image: HTMLCanvasElement; x: number; y: number } => t.image !== null),
+    });
   }
 
   /** Tuiles couvrant la vue (avec une marge), au niveau de détail adapté au zoom. */
   private computeRegion(zoom: number): Region | null {
     const b = this.map.getBounds();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = this.map.getPixelRatio();
     let z = Math.min(MAX_TILE_ZOOM, Math.max(1, Math.round(zoom + Math.log2(dpr))));
     const padX = (b.getEast() - b.getWest()) * 0.25;
     const padY = (b.getNorth() - b.getSouth()) * 0.25;
@@ -189,19 +103,19 @@ export class NightLightsDetail {
     return null;
   }
 
-  private loadTile(z: number, x: number, y: number): Promise<HTMLImageElement | null> {
+  private loadTile(z: number, x: number, y: number): Promise<HTMLCanvasElement | null> {
     const key = `${z}/${x}/${y}`;
     let p = this.tileCache.get(key);
     if (!p) {
       p = new Promise((resolve) => {
         const img = new Image();
         img.crossOrigin = 'anonymous';
-        img.onload = () => resolve(img);
+        img.onload = () => resolve(extractLights(img));
         img.onerror = () => resolve(null);
         img.src = TILE_URL.replace('{z}', String(z)).replace('{x}', String(x)).replace('{y}', String(y));
       });
       this.tileCache.set(key, p);
-      if (this.tileCache.size > 300) this.tileCache.delete(this.tileCache.keys().next().value!);
+      if (this.tileCache.size > 200) this.tileCache.delete(this.tileCache.keys().next().value!);
     }
     return p;
   }
@@ -211,8 +125,17 @@ export class NightLightsDetail {
  * Les images NASA montrent aussi le sol (bleu sombre) et la neige (bleutée) :
  * on ne garde que les lumières, qui sont chaudes (rouge > bleu).
  */
-function extractLights(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-  const img = ctx.getImageData(0, 0, w, h);
+function extractLights(tile: HTMLImageElement): HTMLCanvasElement | null {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = TILE;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+  ctx.drawImage(tile, 0, 0, TILE, TILE);
+  let img: ImageData;
+  try {
+    img = ctx.getImageData(0, 0, TILE, TILE);
+  } catch {
+    return null; // image lue sans autorisation de partage : inutilisable
+  }
   const px = img.data;
   for (let i = 0; i < px.length; i += 4) {
     const r = px[i];
@@ -231,6 +154,7 @@ function extractLights(ctx: CanvasRenderingContext2D, w: number, h: number): voi
     px[i + 3] = a * 255;
   }
   ctx.putImageData(img, 0, 0);
+  return canvas;
 }
 
 function lonToTileX(lon: number, n: number): number {
@@ -239,25 +163,6 @@ function lonToTileX(lon: number, n: number): number {
 function latToTileY(lat: number, n: number): number {
   const r = lat * DEG;
   return ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n;
-}
-function tileXToLon(x: number, n: number): number {
-  return (x / n) * 360 - 180;
-}
-function tileYToLat(y: number, n: number): number {
-  return Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n))) / DEG;
-}
-function regionCorners(r: Region): [[number, number], [number, number], [number, number], [number, number]] {
-  const n = 2 ** r.z;
-  const w = tileXToLon(r.x0, n);
-  const e = tileXToLon(r.x0 + r.cols, n);
-  const nn = tileYToLat(r.y0, n);
-  const s = tileYToLat(r.y0 + r.rows, n);
-  return [
-    [w, nn],
-    [e, nn],
-    [e, s],
-    [w, s],
-  ];
 }
 function sameRegion(a: Region, b: Region): boolean {
   return a.z === b.z && a.x0 === b.x0 && a.y0 === b.y0 && a.cols === b.cols && a.rows === b.rows;

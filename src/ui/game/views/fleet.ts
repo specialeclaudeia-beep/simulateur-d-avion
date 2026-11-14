@@ -3,13 +3,15 @@
  * réparation, vente…), contrats chez les constructeurs et marché de l'occasion.
  */
 import * as act from '../../../game/actions';
+import { PERKS, limits, modelProblem } from '../../../game/campaign';
 import { DAY, MIN_STARS, USED_DELIVERY_HOURS, USED_MARKET_SIZE } from '../../../game/config';
 import { CATEGORY_LABEL, type AircraftModel } from '../../../game/data';
 import { YEAR, ageYears, aircraftValue, blockMinutes, pilotProblem, routeProblem } from '../../../game/economy';
 import { orderQuote } from '../../../game/fleet';
 import { maintenanceQuote, repairQuote } from '../../../game/sim';
 import type { Aircraft } from '../../../game/state';
-import { avatar, badge, bar, btn, dateLong, empty, esc, flagEmoji, kv, money, note, num, pct, row, section, signedMoneyHtml, stars, when } from '../dom';
+import { icon } from '../../icons';
+import { avatar, badge, bar, btn, dateLong, empty, esc, flagEmoji, kv, locked, money, note, num, pct, plural, quota, row, section, signedMoneyHtml, stars, when, withIcon } from '../dom';
 import type { Ui, View } from '../ui';
 import { aircraftName, cityOf, pilotFullName, place, statusOf } from './common';
 import { openLineView } from './lines';
@@ -17,9 +19,21 @@ import { hireView, trainNewView } from './pilots';
 
 // ───────────────────────── Outils ─────────────────────────
 
-function modelIcon(m: AircraftModel): string {
-  if (m.kind === 'cargo') return '📦';
-  return m.category === 'regional_turboprop' ? '🛩️' : '✈️';
+function modelIcon(m: AircraftModel, size = 22): string {
+  if (m.kind === 'cargo') return icon('box', size);
+  return icon(m.category === 'regional_turboprop' ? 'prop' : 'plane', size);
+}
+
+/** Mode par échelons : la flotte est-elle au complet ? */
+function fleetFull(ui: Ui, more = 1): boolean {
+  const lim = limits(ui.game.state);
+  return !!lim && ui.game.state.aircraft.length + more > lim.fleet;
+}
+
+function fleetFullNote(ui: Ui): string {
+  const lim = limits(ui.game.state);
+  if (!lim) return '';
+  return locked(`Flotte au complet : ${lim.fleet} avions à cet échelon. L’amélioration « ${PERKS.fleet.title} » ou l’échelon suivant en autorisent plus.`);
 }
 
 function capacity(m: AircraftModel): string {
@@ -57,7 +71,8 @@ export function fleetView(ui: Ui): View {
       const s = ui.game.state;
       const d = ui.game.data;
       const now = ui.now;
-      const actions = `<div class="g-actions">${btn('🛒 Acheter neuf', 'buyNew')}${btn('♻️ Occasion', 'used', { cls: 'ghost' })}</div>`;
+      const lim = limits(s);
+      const actions = `<div class="g-actions">${btn(withIcon('cart', 'Acheter neuf'), 'buyNew')}${btn(withIcon('recycle', 'Occasion'), 'used', { cls: 'ghost' })}</div>`;
       if (!s.aircraft.length) {
         return (
           actions +
@@ -81,7 +96,7 @@ export function fleetView(ui: Ui): View {
           });
         })
         .join('');
-      return `${actions}<p class="g-small">${s.aircraft.length} avion(s) · ${flying} en vol</p><div class="g-list">${rows}</div>`;
+      return `${actions}<p class="g-small">${lim ? `${quota('plane', s.aircraft.length, lim.fleet, 'Avions autorisés à cet échelon')} ` : `${plural(s.aircraft.length, 'avion')} · `}${flying} en vol</p><div class="g-list">${rows}</div>`;
     },
     action(a, el) {
       if (a === 'buyNew') ui.push(buyNewView(ui));
@@ -115,16 +130,16 @@ export function aircraftView(ui: Ui, id: string): View {
       const canService = (ac.status === 'idle' || ac.status === 'ground') && atHub && ac.condition < 99;
 
       // Actions principales selon l'état.
-      const main: string[] = [btn('🗺️ Voir sur la carte', 'map', { cls: 'ghost' })];
+      const main: string[] = [btn(withIcon('pin', 'Voir sur la carte'), 'map', { cls: 'ghost' })];
       if (ac.status === 'broken') {
         const q = repairQuote(ui.ctx, ac);
-        main.unshift(btn(`🔧 Réparer · ${money(q.cost)}`, 'repair'));
+        main.unshift(btn(withIcon('wrench', `Réparer · ${money(q.cost)}`), 'repair'));
       } else {
         // Toujours affiché (grisé quand c'est impossible) : sinon, en vitesse ×10 000, le
         // bouton apparaît et disparaît à chaque escale et toute la fiche saute.
         const q = maintenanceQuote(ui.ctx, ac);
         main.push(
-          btn(`🛠️ Révision · ${money(q.cost)} · ${q.hours} h`, 'service', {
+          btn(withIcon('service', `Révision · ${money(q.cost)} · ${q.hours} h`), 'service', {
             cls: 'ghost',
             disabled: !canService,
             extra: canService ? '' : ' title="Possible seulement quand l’avion est au sol à un hub"',
@@ -135,7 +150,7 @@ export function aircraftView(ui: Ui, id: string): View {
       const pilotBlock = pilot
         ? `<div class="g-card g-inline"><span class="g-person">${avatar(pilot)} <b>${esc(pilotFullName(pilot))}</b> ${stars(pilot.stars)}</span>
              <span>${btn('Changer', 'pickPilot', { cls: 'ghost small' })}${btn('Retirer', 'unassign', { cls: 'ghost small' })}</span></div>`
-        : `${note('Sans pilote, l’avion reste au sol.', 'warn')}${btn('🧑‍✈️ Choisir un pilote', 'pickPilot')}`;
+        : `${note('Sans pilote, l’avion reste au sol.', 'warn')}${btn(withIcon('pilot', 'Choisir un pilote'), 'pickPilot')}`;
 
       const lines = ac.program.map((lid) => s.lines.find((l) => l.id === lid)).filter((l) => l !== undefined);
       const departures = act.dailyDepartures(ui.ctx, ac);
@@ -144,7 +159,7 @@ export function aircraftView(ui: Ui, id: string): View {
             .map(
               (l) => `<div class="g-row static"><span class="g-row-main"><span class="g-row-title">${place(d, l.hub)} ⇄ ${place(d, l.dest)}</span>
                 <span class="g-row-sub">${num(l.km)} km · ${Math.round(blockMinutes(l.km, m))} min de vol</span></span>
-                ${btn('✕', 'removeLine', { id: l.id, cls: 'ghost small', extra: ' aria-label="Retirer la ligne"' })}</div>`,
+                ${btn(icon('close', 16), 'removeLine', { id: l.id, cls: 'ghost small', extra: ' aria-label="Retirer la ligne"' })}</div>`,
             )
             .join('')}</div>
            <p class="g-small">≈ ${departures.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} départs par jour depuis ${esc(cityOf(d, ac.base))}, en alternant les lignes.</p>`
@@ -161,7 +176,7 @@ export function aircraftView(ui: Ui, id: string): View {
           <div class="g-actions">${main.join('')}</div>
         </div>
         ${section('Pilote', pilotBlock)}
-        ${section('Lignes', linesBlock + btn('＋ Ajouter une ligne', 'addLine', { cls: lines.length ? 'ghost' : '' }))}
+        ${section('Lignes', linesBlock + btn(withIcon('plus', 'Ajouter une ligne'), 'addLine', { cls: lines.length ? 'ghost' : '' }))}
         ${section(
           'Résultats depuis l’achat',
           kv([
@@ -188,7 +203,7 @@ export function aircraftView(ui: Ui, id: string): View {
         )}
         ${section(
           'Gestion',
-          `<div class="g-actions">${btn('✏️ Renommer', 'rename', { cls: 'ghost' })}${s.hubs.length > 1 ? btn('🏢 Changer de hub', 'transfer', { cls: 'ghost' }) : ''}${btn(
+          `<div class="g-actions">${btn(withIcon('edit', 'Renommer'), 'rename', { cls: 'ghost' })}${s.hubs.length > 1 ? btn(withIcon('hub', 'Changer de hub'), 'transfer', { cls: 'ghost' }) : ''}${btn(
             `Vendre · ${money(act.resalePrice(ui.ctx, ac, now))}`,
             'sell',
             { cls: 'ghost danger' },
@@ -201,10 +216,11 @@ export function aircraftView(ui: Ui, id: string): View {
       if (!ac) return;
       switch (a) {
         case 'map':
+          ui.revealMap();
           if (ac.status === 'flying' && ac.leg) {
+            // Toucher (ou choisir) un avion ferme le panneau sur téléphone : voir index.ts.
             ui.aircraft.selectProvided(ac.leg.id);
             ui.aircraft.follow(true);
-            if (window.innerWidth < 900) ui.close();
           } else {
             ui.flyTo(ac.location, 9);
           }
@@ -286,7 +302,9 @@ function pilotPickView(ui: Ui, acId: string): View {
               .join('')}</div>`,
           )
         : '';
-      return `${intro}${list}<div class="g-actions">${btn('Recruter un pilote', 'hire', { cls: 'ghost' })}${btn('Former un débutant', 'train', { cls: 'ghost' })}</div>${unfit}`;
+      const lim = limits(s);
+      const recruit = !lim || lim.recruit;
+      return `${intro}${list}<div class="g-actions">${recruit ? btn(withIcon('userPlus', 'Recruter un pilote'), 'hire', { cls: 'ghost' }) : ''}${btn(withIcon('school', 'Former un débutant'), 'train', { cls: 'ghost' })}</div>${unfit}`;
     },
     action(a, el) {
       if (a === 'pick') {
@@ -318,16 +336,16 @@ function linePickView(ui: Ui, acId: string): View {
             : row({
                 action: 'add',
                 id: l.id,
-                icon: '🗺️',
+                icon: icon('route', 22),
                 title: `${place(d, l.hub)} ⇄ ${place(d, l.dest)}`,
-                sub: `${num(l.km)} km · ${served ? `${served} avion(s) déjà dessus` : 'aucun avion pour l’instant'}`,
+                sub: `${num(l.km)} km · ${served ? `${plural(served, 'avion')} déjà dessus` : 'aucun avion pour l’instant'}`,
               });
         })
         .join('');
       return `
         <p class="g-small">Lignes au départ de ${place(d, ac.base)}. Un avion peut en desservir plusieurs à tour de rôle.</p>
         ${rows ? `<div class="g-list">${rows}</div>` : note('Aucune autre ligne ne part de ce hub.', 'info')}
-        ${btn('＋ Ouvrir une nouvelle ligne', 'open', { cls: 'ghost' })}
+        ${btn(withIcon('plus', 'Ouvrir une nouvelle ligne'), 'open', { cls: 'ghost' })}
       `;
     },
     action(a, el) {
@@ -359,7 +377,7 @@ function transferView(ui: Ui, acId: string): View {
           const problem = km > m.rangeKm ? 'Trop loin pour cet avion' : left < 1 ? 'Parking plein' : '';
           return problem
             ? `<div class="g-row static dim"><span class="g-row-main"><span class="g-row-title">${place(d, h.iata)}</span><span class="g-row-sub">${problem}</span></span></div>`
-            : row({ action: 'go', id: h.iata, icon: '🏢', title: place(d, h.iata), sub: `${num(km)} km · vol de convoyage sans passagers` });
+            : row({ action: 'go', id: h.iata, icon: icon('hub', 22), title: place(d, h.iata), sub: `${num(km)} km · vol de convoyage sans passagers` });
         })
         .join('');
       return `${note('L’avion part tout de suite s’installer à son nouveau hub. Ses lignes actuelles lui sont retirées.', 'info')}<div class="g-list">${rows}</div>`;
@@ -391,12 +409,12 @@ export function buyNewView(ui: Ui): View {
             id: mf.id,
             icon: `<span class="g-flag">${flagEmoji(mf.country)}</span>`,
             title: esc(mf.name),
-            sub: `${models.length} modèle(s) · remise ${Math.round(lo * 100)} à ${Math.round(hi * 100)}\u202f% selon la quantité${bought ? ` · ${bought} déjà acheté(s)` : ''}`,
+            sub: `${plural(models.length, 'modèle')} · remise ${Math.round(lo * 100)} à ${Math.round(hi * 100)}\u202f% selon la quantité${bought ? ` · ${bought} déjà ${bought > 1 ? 'achetés' : 'acheté'}` : ''}`,
           });
         })
         .join('');
-      return `<p class="g-small">Un contrat se négocie : plus tu commandes d’avions d’un coup, plus la remise sur le prix catalogue est grande. Les clients fidèles gagnent un petit bonus.</p>
-        ${btn('♻️ Moins cher : les avions d’occasion', 'used', { cls: 'ghost' })}
+      return `${fleetFull(ui) ? fleetFullNote(ui) : ''}<p class="g-small">Un contrat se négocie : plus tu commandes d’avions d’un coup, plus la remise sur le prix catalogue est grande. Les clients fidèles gagnent un petit bonus.</p>
+        ${btn(withIcon('recycle', 'Moins cher : les avions d’occasion'), 'used', { cls: 'ghost' })}
         <div class="g-list">${rows}</div>`;
     },
     action(a, el) {
@@ -413,18 +431,24 @@ function manufacturerView(ui: Ui, mfrId: string): View {
     render() {
       const d = ui.game.data;
       const year = new Date(ui.now).getUTCFullYear();
-      const models = d.models.filter((m) => m.mfr === mfrId && m.inProduction).sort((a, b) => a.priceUsd - b.priceUsd);
+      const s = ui.game.state;
+      // Les modèles autorisés d'abord ; ceux que l'échelon n'ouvre pas encore sont grisés, avec un cadenas.
+      const models = d.models
+        .filter((m) => m.mfr === mfrId && m.inProduction)
+        .sort((a, b) => Number(!!modelProblem(s, a)) - Number(!!modelProblem(s, b)) || a.priceUsd - b.priceUsd);
       return `<div class="g-list">${models
-        .map((m) =>
-          row({
+        .map((m) => {
+          const lockedModel = modelProblem(s, m) !== null;
+          return row({
             action: 'model',
             id: m.id,
-            icon: modelIcon(m),
+            icon: lockedModel ? icon('lock', 20) : modelIcon(m),
+            cls: lockedModel ? 'dim' : '',
             title: `${esc(m.name)}${m.eis > year ? ` ${badge(`dès ${m.eis}`, 'mute')}` : ''}`,
             sub: `${CATEGORY_LABEL[m.category]} · ${capacity(m)} · ${num(m.rangeKm)} km`,
             right: money(m.priceUsd),
-          }),
-        )
+          });
+        })
         .join('')}</div><p class="g-small">Prix catalogue, avant remise.</p>`;
     },
     action(a, el) {
@@ -451,7 +475,13 @@ function modelView(ui: Ui, modelId: string): View {
       const left = parkingLeft(ui, base);
       const min = MIN_STARS[m.category] ?? 1;
       const problems: string[] = [];
-      if (left < qty) problems.push(`Parking de ${esc(cityOf(d, base))} : ${left} place(s) libre(s). Agrandis-le dans l’onglet Hubs.`);
+      const lim = limits(s);
+      const lockedModel = modelProblem(s, m);
+      if (lockedModel) problems.push(esc(lockedModel));
+      else if (lim && s.aircraft.length + qty > lim.fleet) {
+        problems.push(`Flotte limitée à ${lim.fleet} avions à cet échelon (tu en as ${s.aircraft.length}). L’amélioration « ${PERKS.fleet.title} » ou l’échelon suivant en autorisent plus.`);
+      }
+      if (left < qty) problems.push(`Parking de ${esc(cityOf(d, base))} : ${left ? plural(left, 'place libre', 'places libres') : 'aucune place libre'}. Agrandis-le dans l’onglet Hubs.`);
       if (q.total > s.cash) problems.push(`Il te manque ${money(q.total - s.cash)}.`);
       return `
         <div class="g-card">
@@ -478,14 +508,14 @@ function modelView(ui: Ui, modelId: string): View {
             <button type="button" class="g-btn ghost small" data-a="qty" data-id="1" aria-label="Un de plus">＋</button>
           </div>
           ${kv([
-            ['Remise négociée', `${pct(q.discount)}${q.loyalty > 0 ? ` <small>(dont fidélité ${pct(q.loyalty)})</small>` : ''}`],
+            ['Remise négociée', `${pct(q.discount)}${q.loyalty > 0 ? ` <small>(dont fidélité ${pct(q.loyalty)})</small>` : ''}${lim && lim.discount > 0 ? ` <small>(dont négociateur ${pct(lim.discount)})</small>` : ''}`],
             ['Prix par avion', money(q.unitPrice)],
             ['Total', `<b>${money(q.total)}</b>`],
             ['Première livraison', `${esc(dateLong(q.deliveries[0]))} (${Math.max(1, Math.round((q.deliveries[0] - ui.now) / DAY))} jours)`],
             ...(qty > 1 ? ([['Dernière livraison', esc(dateLong(q.deliveries[q.deliveries.length - 1]))]] as [string, string][]) : []),
           ])}
           ${problems.map((p) => note(p, 'warn')).join('')}
-          ${btn(`✍️ Signer le contrat · ${money(q.total)}`, 'sign', { disabled: problems.length > 0 })}`,
+          ${btn(withIcon('contract', `Signer le contrat · ${money(q.total)}`), 'sign', { disabled: problems.length > 0 })}`,
         )}
       `;
     },
@@ -529,6 +559,7 @@ export function usedMarketView(ui: Ui): View {
       const now = ui.now;
       if (!s.hubs.some((h) => h.iata === base)) base = s.hubs[0].iata;
       const next = s.market.refreshedAt + 7 * DAY;
+      const full = fleetFull(ui);
       const cards = s.market.used
         .map((l) => {
           const m = d.model(l.modelId);
@@ -537,12 +568,13 @@ export function usedMarketView(ui: Ui): View {
             <p class="g-title-line">${modelIcon(m)} <b>${esc(d.manufacturerById.get(m.mfr)?.name ?? '')} ${esc(m.name)}</b> · ${capacity(m)}</p>
             <p class="g-small">${age.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} ans · ${num(l.hours)} h de vol · ${num(m.rangeKm)} km de rayon d’action</p>
             <p class="g-cond">État ${bar(l.condition / 100)} <b>${l.condition}\u202f%</b></p>
-            <div class="g-listing-foot"><b class="g-price">${money(l.price)}</b>${btn('Acheter', 'buy', { id: l.id, disabled: l.price > s.cash })}</div>
+            <div class="g-listing-foot"><b class="g-price">${money(l.price)}</b>${btn('Acheter', 'buy', { id: l.id, disabled: l.price > s.cash || full || modelProblem(s, m) !== null })}</div>
           </div>`;
         })
         .join('');
       return `
         <p class="g-small">${USED_MARKET_SIZE} annonces renouvelées chaque semaine (prochaines ${esc(when(next, now))}). Livraison en ${USED_DELIVERY_HOURS} h. Un avion usé coûte moins cher mais tombe plus souvent en panne.</p>
+        ${full ? fleetFullNote(ui) : ''}
         ${hubSelect(ui, base)}
         ${parkingLeft(ui, base) < 1 ? note(`Parking de ${esc(cityOf(d, base))} plein : agrandis-le dans l’onglet Hubs.`, 'warn') : ''}
         ${cards || empty('Plus aucune annonce cette semaine.')}

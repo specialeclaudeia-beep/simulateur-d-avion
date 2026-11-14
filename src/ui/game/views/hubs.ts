@@ -4,11 +4,13 @@
  * achat d'un nouveau hub dans le monde entier.
  */
 import * as act from '../../../game/actions';
+import { PERKS, limits } from '../../../game/campaign';
 import { DEPARTURES_PER_GATE, HUB_RESALE } from '../../../game/config';
 import { TIER_LABEL, type Airport } from '../../../game/data';
 import { HUB_UPGRADE_LABEL, hubPrice, hubResale, upgradeInfo, type HubUpgrade } from '../../../game/hubs';
 import { basedAircraft, hubDepartures } from '../../../game/schedule';
-import { bar, btn, compact, empty, esc, flagEmoji, fold, kv, money, note, num, row, section, stars } from '../dom';
+import { icon } from '../../icons';
+import { bar, btn, compact, empty, esc, flagEmoji, fold, kv, locked, money, note, num, plural, quota, row, section, stars, withIcon } from '../dom';
 import type { Ui, View } from '../ui';
 import { aircraftName, cityOf, place } from './common';
 import { aircraftView, buyNewView } from './fleet';
@@ -22,10 +24,15 @@ const LIST_LIMIT = 50;
 
 function guide(ui: Ui): string {
   const s = ui.game.state;
+  // Mode par échelons, sans bureau de recrutement : le premier pilote arrive avec le premier avion.
+  const lim = limits(s);
+  const founder = !!lim && !lim.recruit;
   const steps = [
     { done: s.lines.length > 0, text: 'Ouvre ta première ligne depuis ton hub', a: 'g-line', label: 'Ouvrir une ligne' },
-    { done: s.aircraft.length > 0, text: 'Achète un avion, neuf ou d’occasion', a: 'g-plane', label: 'Acheter' },
-    { done: s.pilots.length > 0, text: 'Recrute un pilote qualifié pour cet avion', a: 'g-pilot', label: 'Recruter' },
+    { done: s.aircraft.length > 0, text: founder ? 'Achète un avion : ton premier pilote arrive avec lui' : 'Achète un avion, neuf ou d’occasion', a: 'g-plane', label: 'Acheter' },
+    founder
+      ? { done: s.pilots.length > 0, text: 'Accueille ton premier pilote (les suivants se forment)', a: 'g-pilots', label: 'Pilotes' }
+      : { done: s.pilots.length > 0, text: 'Recrute un pilote qualifié pour cet avion', a: 'g-pilot', label: 'Recruter' },
     { done: s.aircraft.some((a) => a.pilotId && a.program.length), text: 'Dans la fiche de l’avion : donne-lui son pilote et sa ligne', a: 'g-fleet', label: 'Flotte' },
   ];
   if (steps.every((x) => x.done) && s.stats.flights > 0) return '';
@@ -35,7 +42,7 @@ function guide(ui: Ui): string {
     <ol>${steps
       .map(
         (x, i) =>
-          `<li class="${x.done ? 'done' : ''}"><span>${x.done ? '✅' : `${i + 1}.`} ${x.text}</span>${!x.done && i === next ? btn(x.label, x.a, { cls: 'small' }) : ''}</li>`,
+          `<li class="${x.done ? 'done' : ''}"><span>${x.done ? icon('checkCircle', 18) : `<b class="g-step-n">${i + 1}</b>`} ${x.text}</span>${!x.done && i === next ? btn(x.label, x.a, { cls: 'small' }) : ''}</li>`,
       )
       .join('')}</ol>
     <p class="g-small">Ensuite, accélère le temps en haut (×100, ×1000) pour voir tes avions voler et l’argent rentrer.</p>
@@ -53,6 +60,9 @@ function guideAction(ui: Ui, a: string): boolean {
       return true;
     case 'g-pilot':
       ui.push(hireView(ui));
+      return true;
+    case 'g-pilots':
+      ui.openTab('pilots');
       return true;
     case 'g-fleet':
       ui.openTab('fleet');
@@ -80,14 +90,19 @@ export function hubsView(ui: Ui): View {
           return row({
             action: 'hub',
             id: h.iata,
-            icon: '🏢',
+            icon: icon('hub', 22),
             title: `${esc(a.city || a.name)} <small>${a.iata}</small>`,
             sub: `${TIER_LABEL[a.tier]} · ${lines}/${h.lineSlots} lignes · ${based}/${h.parking} avions · ${Math.ceil(dep.used)}/${dep.capacity} départs/jour`,
             right: stars(h.quality),
           });
         })
         .join('');
-      return `${guide(ui)}<div class="g-list">${rows}</div>${btn('＋ Acheter un nouveau hub', 'catalog', { cls: 'ghost' })}`;
+      const lim = limits(s);
+      const more =
+        lim && s.hubs.length >= lim.hubs
+          ? locked(`${lim.hubs > 1 ? `${lim.hubs} hubs au plus` : 'Un seul hub'} à cet échelon. L’amélioration « ${PERKS.hub.title} » en ouvre un de plus.`)
+          : btn(withIcon('plus', 'Acheter un nouveau hub'), 'catalog', { cls: 'ghost' });
+      return `${guide(ui)}${lim ? `<p class="g-small">${quota('hub', s.hubs.length, lim.hubs, 'Hubs autorisés à cet échelon')}</p>` : ''}<div class="g-list">${rows}</div>${more}`;
     },
     action(a, el) {
       if (guideAction(ui, a)) return;
@@ -118,15 +133,18 @@ export function hubView(ui: Ui, iata: string): View {
       const dep = hubDepartures(ui.ctx, h);
       const lines = s.lines.filter((l) => l.hub === iata);
       const based = basedAircraft(s, iata);
+      const lim = limits(s);
       const upgrades = UPGRADES.map((kind) => {
-        const info = upgradeInfo(d, h, kind);
+        const info = upgradeInfo(d, h, kind, lim);
+        // Bloqué par l'échelon (et non par l'aéroport) : il reste de la marge sans la limite.
+        const capped = !info && !!lim && upgradeInfo(d, h, kind) !== null;
         const label = HUB_UPGRADE_LABEL[kind];
         const current = kind === 'maintenance' ? (h.maintenance ? `niveau ${h.maintenance}` : 'aucun') : kind === 'quality' ? stars(h.quality) : String(h[kind]);
         return `<div class="g-upgrade">
-          <span class="g-upgrade-icon" aria-hidden="true">${label.icon}</span>
+          <span class="g-upgrade-icon">${icon(label.icon, 22)}</span>
           <span class="g-upgrade-main"><b>${label.title}</b> <span class="g-small">${current}${info ? ` → ${kind === 'quality' ? `${info.next} ★` : kind === 'maintenance' ? `niveau ${info.next}` : info.next}` : ''}</span>
-            <small>${info ? esc(info.effect) : 'Maximum atteint'}</small></span>
-          ${info ? btn(money(info.cost), 'up', { id: kind, cls: 'small', disabled: info.cost > s.cash }) : ''}
+            <small>${info ? esc(info.effect) : capped ? 'Maximum de cet échelon : il montera au suivant, ou avec une amélioration' : 'Maximum atteint'}</small></span>
+          ${info ? btn(money(info.cost), 'up', { id: kind, cls: 'small', disabled: info.cost > s.cash }) : capped ? `<span class="g-upgrade-lock">${icon('lock', 18)}</span>` : ''}
         </div>`;
       }).join('');
       return `
@@ -134,23 +152,23 @@ export function hubView(ui: Ui, iata: string): View {
           <p class="g-title-line"><b>${esc(a.name)}</b> <small>${a.iata}</small></p>
           <p class="g-small">${TIER_LABEL[a.tier]} · n° ${a.rank} mondial · ${compact(a.pax)} passagers par an · ${d.routesFrom(iata).length} destinations réelles</p>
           ${kv([
-            ['Départs par jour', `${bar(dep.capacity ? 1 - dep.used / dep.capacity : 0, 'auto')} ${Math.ceil(dep.used)} / ${dep.capacity} <small>(${h.gates} porte(s) × ${DEPARTURES_PER_GATE})</small>`],
+            ['Départs par jour', `${bar(dep.capacity ? 1 - dep.used / dep.capacity : 0, 'auto')} ${Math.ceil(dep.used)} / ${dep.capacity} <small>(${plural(h.gates, 'porte')} × ${DEPARTURES_PER_GATE})</small>`],
             ['Lignes', `${lines.length} / ${h.lineSlots} licences`],
             ['Avions basés', `${based.length} / ${h.parking} places`],
           ])}
-          <div class="g-actions">${btn('🗺️ Voir sur la carte', 'map', { cls: 'ghost' })}</div>
+          <div class="g-actions">${btn(withIcon('pin', 'Voir sur la carte'), 'map', { cls: 'ghost' })}</div>
         </div>
         ${section('Améliorer le hub', `<div class="g-upgrades">${upgrades}</div>`)}
         ${section(
           `Lignes depuis ce hub (${lines.length})`,
           (lines.length
-            ? `<div class="g-list">${lines.map((l) => row({ action: 'line', id: l.id, icon: '🗺️', title: `${place(d, l.hub)} ⇄ ${place(d, l.dest)}`, sub: `${num(l.km)} km` })).join('')}</div>`
-            : '') + btn('＋ Ouvrir une ligne', 'open', { cls: lines.length ? 'ghost' : '' }),
+            ? `<div class="g-list">${lines.map((l) => row({ action: 'line', id: l.id, icon: icon('route', 22), title: `${place(d, l.hub)} ⇄ ${place(d, l.dest)}`, sub: `${num(l.km)} km` })).join('')}</div>`
+            : '') + btn(withIcon('plus', 'Ouvrir une ligne'), 'open', { cls: lines.length ? 'ghost' : '' }),
         )}
         ${section(
           `Avions basés ici (${based.length})`,
           based.length
-            ? `<div class="g-list">${based.map((ac) => row({ action: 'aircraft', id: ac.id, icon: '✈️', title: esc(aircraftName(ac)), sub: esc(d.model(ac.modelId).name) })).join('')}</div>`
+            ? `<div class="g-list">${based.map((ac) => row({ action: 'aircraft', id: ac.id, icon: icon('plane', 22), title: esc(aircraftName(ac)), sub: esc(d.model(ac.modelId).name) })).join('')}</div>`
             : note('Aucun avion basé ici.', 'info'),
         )}
         ${s.hubs.length > 1 ? btn('Vendre ce hub', 'sell', { cls: 'ghost danger' }) : ''}
@@ -161,8 +179,8 @@ export function hubView(ui: Ui, iata: string): View {
       if (!h) return;
       switch (a) {
         case 'map':
+          ui.revealMap();
           ui.flyTo(iata, 9);
-          if (window.innerWidth < 900) ui.close();
           return;
         case 'up':
           ui.act(act.upgradeHub, iata, el.dataset.id as HubUpgrade);
@@ -204,13 +222,16 @@ function hubCatalogView(ui: Ui): View {
       let list = d.airportsOfCountry(country).filter((a) => !owned.has(a.iata));
       if (q) list = list.filter((a) => fold(`${a.city} ${a.name} ${a.iata}`).includes(q));
       const shown = list.slice(0, LIST_LIMIT);
+      // Mode par échelons : les hubs restent dans le pays de l'échelon.
+      const home = !!limits(s);
+      if (home) country = s.company.country;
       const foreign = country !== s.company.country;
       const options = d
         .playableCountries()
         .map((c) => `<option value="${c.code}"${c.code === country ? ' selected' : ''}>${flagEmoji(c.code)} ${esc(c.name)}</option>`)
         .join('');
       return `
-        <label class="g-field"><span>Pays</span><select class="g-input" data-in="country">${options}</select></label>
+        ${home ? `<p class="g-small">Aéroports de ${flagEmoji(country)} ${esc(d.country(country)?.name ?? country)} : en mode par échelons, tes hubs restent dans le pays de l’échelon.</p>` : `<label class="g-field"><span>Pays</span><select class="g-input" data-in="country">${options}</select></label>`}
         ${foreign ? note('Hors de ton pays, un hub coûte 25\u202f% de plus (droits de trafic).', 'info') : ''}
         <input class="g-input" type="search" data-in="search" placeholder="Rechercher une ville, un aéroport…" value="${esc(search)}">
         <div class="g-list">${shown.map((a) => airportRow(ui, a)).join('') || empty('Aucun aéroport ne correspond.')}</div>

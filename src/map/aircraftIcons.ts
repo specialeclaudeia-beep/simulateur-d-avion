@@ -1,9 +1,8 @@
-import type { Map as MapLibreMap } from 'maplibre-gl';
-
 /**
  * Silhouettes d'avions vues de dessus, dessinées au démarrage (aucune image à
- * télécharger) puis converties en « champ de distance » (SDF) : MapLibre peut
- * alors les teindre à la couleur de chaque compagnie et leur ajouter un contour.
+ * télécharger) et rangées dans une seule image (« atlas ») pour la carte
+ * graphique : le calque des avions les teint à la couleur de chaque compagnie
+ * et leur ajoute un contour d'épaisseur constante (champ de distance).
  *
  * Une silhouette par grande famille d'avions : turbopropulseur, jet régional à
  * moteurs à l'arrière (CRJ, ERJ, 717) ou sous les ailes (E-Jet, A220), monocouloir,
@@ -58,13 +57,17 @@ export function iconKindFor(model: { family: string; category: string; id: strin
   return model.category as IconKind;
 }
 
-const SIZE = 64; // pixels de l'icône (envergure ≈ 48 px)
-const BUFFER = 8; // marge pour le contour
-/** Distance (px) couverte par le champ : MapLibre place le bord à 0,75 et compte 8 px par unité. */
+/** Case du champ de distance (px) ; la marge laisse la place du contour. */
+const SIZE = 64;
+const BUFFER = 8;
+/** Distance (px) couverte par le champ : le bord est à 0,75 et on compte 8 px par unité. */
 const SDF_RADIUS = 8;
-
-export const iconId = (kind: IconKind): string => `plane-${kind}`;
-export const accentId = (kind: IconKind): string => `plane-${kind}-accent`;
+/** Case de l'atlas (px) : silhouettes nettes jusqu'aux plus gros zooms. */
+export const ATLAS_CELL = 192;
+/** Cases par rangée de l'atlas (3 × 3 pour les 9 silhouettes). */
+export const ATLAS_COLS = 3;
+/** Taille d'une case du champ de distance, pour convertir une distance en pixels d'écran. */
+export const SDF_CELL = SIZE;
 
 /**
  * Livrée d'une compagnie : couleur du fuselage et des accents. Quatre styles,
@@ -102,10 +105,10 @@ type Ctx = CanvasRenderingContext2D;
  * Dessine dans un repère où l'avion tient dans [-1, 1], nez vers le haut (y négatif).
  * `accent` : ne dessine que les parties de la seconde couleur (dérive, moteurs, bouts d'ailes).
  */
-function draw(ctx: Ctx, kind: IconKind, accent = false): void {
-  const s = (SIZE - 2 * BUFFER) / 2;
+function draw(ctx: Ctx, kind: IconKind, accent = false, size = SIZE): void {
+  const s = (size - 2 * BUFFER * (size / SIZE)) / 2;
   ctx.save();
-  ctx.translate(SIZE / 2, SIZE / 2);
+  ctx.translate(size / 2, size / 2);
   ctx.scale(s, s);
   ctx.fillStyle = '#fff';
 
@@ -254,12 +257,12 @@ function draw(ctx: Ctx, kind: IconKind, accent = false): void {
   ctx.restore();
 }
 
-/** Convertit un masque (canal alpha) en champ de distance au format attendu par MapLibre. */
-function toSdf(mask: Uint8ClampedArray): ImageData {
+/** Convertit un masque (canal alpha) en champ de distance (0 à 255, bord à 0,75). */
+function toSdf(mask: Uint8ClampedArray): Uint8ClampedArray<ArrayBuffer> {
   const n = SIZE * SIZE;
   const inside = new Uint8Array(n);
   for (let i = 0; i < n; i++) inside[i] = mask[i * 4 + 3] > 127 ? 1 : 0;
-  const out = new ImageData(SIZE, SIZE);
+  const out = new Uint8ClampedArray(n * 4);
   const R = SDF_RADIUS;
   for (let y = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++) {
@@ -281,26 +284,65 @@ function toSdf(mask: Uint8ClampedArray): ImageData {
       const d = (Math.sqrt(best) - 0.5) * (me ? -1 : 1); // < 0 à l'intérieur
       const a = Math.max(0, Math.min(1, 0.75 - d / 8));
       const o = (y * SIZE + x) * 4;
-      out.data[o] = out.data[o + 1] = out.data[o + 2] = 255;
-      out.data[o + 3] = Math.round(a * 255);
+      // Opaque : le champ voyage dans la couleur (le canvas ne déforme pas une couleur opaque).
+      out[o] = out[o + 1] = out[o + 2] = Math.round(a * 255);
+      out[o + 3] = 255;
     }
   }
   return out;
 }
 
-/** Ajoute toutes les silhouettes à la carte (à appeler une fois, puis après un changement de style). */
-export function addAircraftIcons(map: MapLibreMap): void {
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = SIZE;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-  for (const kind of ICON_KINDS) {
-    for (const accent of [false, true]) {
-      const id = accent ? accentId(kind) : iconId(kind);
-      if (map.hasImage(id)) continue;
-      ctx.clearRect(0, 0, SIZE, SIZE);
-      draw(ctx, kind, accent);
-      const sdf = toSdf(ctx.getImageData(0, 0, SIZE, SIZE).data);
-      map.addImage(id, sdf, { sdf: true, pixelRatio: 2 });
+export interface AircraftAtlas {
+  /** Pixels RGBA : rouge = fuselage, vert = accents (dérive, moteurs, bouts d'ailes), bleu = champ de distance. */
+  data: Uint8Array;
+  size: number;
+}
+
+/** Dessine toutes les silhouettes dans une seule image pour la carte graphique. */
+export function buildAircraftAtlas(): AircraftAtlas {
+  const cell = ATLAS_CELL;
+  const size = cell * ATLAS_COLS;
+  const data = new Uint8Array(size * size * 4);
+
+  const big = document.createElement('canvas');
+  big.width = big.height = cell;
+  const bctx = big.getContext('2d', { willReadFrequently: true })!;
+  const small = document.createElement('canvas');
+  small.width = small.height = SIZE;
+  const sctx = small.getContext('2d', { willReadFrequently: true })!;
+
+  ICON_KINDS.forEach((kind, k) => {
+    const ox = (k % ATLAS_COLS) * cell;
+    const oy = Math.floor(k / ATLAS_COLS) * cell;
+
+    bctx.clearRect(0, 0, cell, cell);
+    draw(bctx, kind, false, cell);
+    const body = bctx.getImageData(0, 0, cell, cell).data;
+    bctx.clearRect(0, 0, cell, cell);
+    draw(bctx, kind, true, cell);
+    const accent = bctx.getImageData(0, 0, cell, cell).data;
+
+    // Champ de distance calculé en petit (rapide), puis agrandi en douceur.
+    sctx.clearRect(0, 0, SIZE, SIZE);
+    draw(sctx, kind, false, SIZE);
+    const field = new ImageData(toSdf(sctx.getImageData(0, 0, SIZE, SIZE).data), SIZE, SIZE);
+    sctx.putImageData(field, 0, 0);
+    bctx.clearRect(0, 0, cell, cell);
+    bctx.imageSmoothingEnabled = true;
+    bctx.imageSmoothingQuality = 'high';
+    bctx.drawImage(small, 0, 0, cell, cell);
+    const sdf = bctx.getImageData(0, 0, cell, cell).data;
+
+    for (let y = 0; y < cell; y++) {
+      for (let x = 0; x < cell; x++) {
+        const i = (y * cell + x) * 4;
+        const o = ((oy + y) * size + ox + x) * 4;
+        data[o] = body[i + 3];
+        data[o + 1] = accent[i + 3];
+        data[o + 2] = sdf[i];
+        data[o + 3] = 255;
+      }
     }
-  }
+  });
+  return { data, size };
 }

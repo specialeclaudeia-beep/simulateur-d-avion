@@ -4,6 +4,7 @@
  */
 import { flagEmoji } from '../../map/countries';
 import { money } from '../../game/ledger';
+import { icon, type IconName } from '../icons';
 
 export { money, flagEmoji };
 
@@ -33,6 +34,11 @@ export function num(n: number): string {
 
 export function num1(n: number): string {
   return nf1.format(n);
+}
+
+/** Le nombre et son nom accordé : « 1 avion », « 3 avions » (en français, 0 et 1 sont au singulier). */
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return `${num(n)} ${Math.abs(n) >= 2 ? many : one}`;
 }
 
 /** 1 234 567 → « 1,2 M », 45 000 → « 45 k ». */
@@ -108,7 +114,7 @@ export function row(opts: { action: string; id?: string; icon?: string; title: s
     ${opts.icon ? `<span class="g-row-icon">${opts.icon}</span>` : ''}
     <span class="g-row-main"><span class="g-row-title">${opts.title}</span>${opts.sub ? `<span class="g-row-sub">${opts.sub}</span>` : ''}</span>
     ${opts.right ? `<span class="g-row-right">${opts.right}</span>` : ''}
-    <span class="g-row-chev" aria-hidden="true">›</span>
+    <span class="g-row-chev">${icon('chevron', 16)}</span>
   </button>`;
 }
 
@@ -139,4 +145,19 @@ export function empty(text: string, action = ''): string {
 
 export function note(text: string, tone: 'info' | 'warn' | 'bad' | 'good' = 'info'): string {
   return `<p class="g-note ${tone}">${text}</p>`;
+}
+
+/** Libellé précédé d'une icône (boutons, puces). */
+export function withIcon(name: IconName, label: string, size = 18): string {
+  return `${icon(name, size)}<span>${label}</span>`;
+}
+
+/** Ce qui n'est pas encore débloqué (mode par échelons). */
+export function locked(text: string): string {
+  return `<p class="g-locked">${icon('lock', 18)}<span>${text}</span></p>`;
+}
+
+/** Compteur « 2 / 4 » avec son icône (limites du mode par échelons). */
+export function quota(name: IconName, used: number, max: number, label: string): string {
+  return `<span class="g-quota${used >= max ? ' full' : ''}" title="${esc(label)}">${icon(name, 14)}${used}\u202f/\u202f${max}</span>`;
 }
